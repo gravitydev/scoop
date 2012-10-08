@@ -4,6 +4,11 @@ Scoop
 Scoop is a query construction toolkit for scala. It is a very early experiment. You could say it is a strange mix between Squeryl and Anorm.
 The main motivation is to provide a concise and practical solution that doesn't necessarily take complete control away from the SQL strings used. 
 
+Installation
+------------
+
+TODO: Maven Repository
+
 Model Definition
 ----------------
 
@@ -45,7 +50,9 @@ Query API (stringly typed)
 *Somewhat usable* This API sacrifices some safety for flexibility and in some cases readability. It looks a bit more like SQL and you can 
 actually combine the model objects with custom query strings.
 
-The main difference compared with SQL is that you should define the aliases before hand so they are available throughout the query.
+The main differences compared with SQL:
+ * You should define the aliases before hand so they are available throughout the query.
+ * *select* is done last.
 
 ```scala
 import com.gravitydev.scoop._, query._
@@ -67,10 +74,35 @@ val query = from(i)
   )
 ```
 
-Installation
-------------
+Mapping and Parsers
+-------------------
 
-TODO: Maven Repository
+```scala
+case class Account (
+  id: Long,
+  name: String
+)
+object Account {
+  def parser (a: Account) = (a.id ~ a.name) map {case (i,n) => Account(i,n)}
+}
+
+case class User (
+  id: Long,
+  name: String,
+  account: Option[Account]
+)
+object User {
+  def parser (u: Users, a: Accounts) = (u.id ~ u.first_name ~ u.last_name ~ opt(Accounts.parser(a)) map {
+    case id~first~last~manager => User(id, first+" "+last, manager)
+  }
+}
+
+val query = from(users)
+  .leftJoin(accounts on employees.manager_id === managers.id)
+  .map {User.parser _}
+
+val res: Seq[User] = query(con) 
+```
 
 Acknowledgements
 ----------------
