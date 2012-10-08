@@ -21,7 +21,8 @@ val query = from(users)(u =>
 Query API (stringly typed)
 --------------------------
 
-*Mostly usable* This API sacrifices some safety for flexibility and in some cases readability. It reads a lot closer to actual SQL.
+*Mostly usable* This API sacrifices some safety for flexibility and in some cases readability. It reads a lot closer to actual SQL and you can 
+actually combine the model objects with custom query strings.
 
 ```scala
 import com.gravitydev.scoop._, query._
@@ -35,7 +36,12 @@ val query = from(issues)
   .leftJoin(a on i.assigned_to === a.id)
   .where(r.accountId isNotNull)
   .orderBy(i.status desc, i.reason desc)
-  .select(i.*, r.first_name as "reporter", a.first_name as "assignee")
+  .select(
+    i.*, 
+    r.first_name as "reporter", 
+    a.first_name as "assignee", 
+    "(SELECT COUNT(*) FROM stats WHERE stats.issue_id = " + i.id.sql + ") as total_stats"
+  )
 ```
 
 Installation
