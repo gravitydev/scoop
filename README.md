@@ -1,7 +1,8 @@
 Scoop
 =====
 
-Scoop is a query construction toolkit for scala. It is a very early experiment. 
+Scoop is a query construction toolkit for scala. It is a very early experiment. You could say it is a strange mix between Squeryl and Anorm.
+The main motivation is to provide a concise and practical solution that doesn't necessarily take complete control away from the SQL strings used. 
 
 Model Definition
 ----------------
@@ -24,8 +25,10 @@ def users = Users("u") // useful for creating default alias
 Strong API
 ----------
 
-*Not ready yet* The strong API is mostly modeled after squeryl (though nowhere near as featured at the moment), but it does not use case classes. 
-You have to do your own mapping. The syntax is also just a bit closer to SQL since you can use symbols like >, <=, etc even with primitives.
+*Not quite ready yet* The strong API is mostly modeled after squeryl (though nowhere near as featured at the moment).
+It tries to provide the stronges guarantees that if your code compiles, the generated SQL is free of syntax (and some semantic) errors. 
+Since you don't define the data model using classes representing rows, you have to do your own mapping though. In that sense, it is closer to ScalaQuery than Squeryl.
+The syntax is also just a bit closer to SQL since you can use symbols like >, <=, etc even with primitives.
 
 ```scala
 import com.gravitydev.scoop._, strong._
@@ -39,10 +42,10 @@ val query = from(users)(u =>
 Query API (stringly typed)
 --------------------------
 
-*Mostly usable* This API sacrifices some safety for flexibility and in some cases readability. It reads a lot closer to actual SQL and you can 
+*Somewhat usable* This API sacrifices some safety for flexibility and in some cases readability. It looks a bit more like SQL and you can 
 actually combine the model objects with custom query strings.
 
-The main difference compared with SQL is that you should define the aliases before hand.
+The main difference compared with SQL is that you should define the aliases before hand so they are available throughout the query.
 
 ```scala
 import com.gravitydev.scoop._, query._
@@ -67,10 +70,10 @@ val query = from(i)
 Installation
 ------------
 
-TODO
+TODO: Maven Repository
 
 Acknowledgements
 ----------------
 
-Lots of inspiration from squeryl, anorm, and the apocalisp blog.
+Lots of inspiration was taken from squeryl, anorm, and the apocalisp blog.
 
