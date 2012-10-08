@@ -3,6 +3,24 @@ Scoop
 
 Scoop is a query construction toolkit for scala. It is a very early experiment. 
 
+Model Definition
+----------------
+
+Since the main purpose is to construct queries, the model definition should pretty much mirror the database.
+
+```scala
+import com.gravitydev.scoop._
+
+class Users (as: String) extends Table[Users]("users", Users) {
+  val id          = col[Long]           ("id")
+  val first_name  = col[String]         ("first_name")
+  val last_name   = col[String]         ("last_name")
+  val age         = col[Int]            ("age")
+  val nickname    = col[Option[String]] ("nickname")
+}
+def users = Users("u") // useful for creating default alias
+```
+
 Strong API
 ----------
 
@@ -24,6 +42,8 @@ Query API (stringly typed)
 *Mostly usable* This API sacrifices some safety for flexibility and in some cases readability. It reads a lot closer to actual SQL and you can 
 actually combine the model objects with custom query strings.
 
+The main difference compared with SQL is that you should define the aliases before hand.
+
 ```scala
 import com.gravitydev.scoop._, query._
 
@@ -31,7 +51,7 @@ val i = issues
 val r = users as "reporter"
 val a = users as "assignee"
 
-val query = from(issues)
+val query = from(i)
   .innerJoin(r on i.reporter_id === r.id)
   .leftJoin(a on i.assigned_to === a.id)
   .where(r.accountId isNotNull)
