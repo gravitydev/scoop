@@ -31,7 +31,7 @@ Strong API
 ----------
 
 *Not quite ready yet* The strong API is mostly modeled after squeryl (though nowhere near as featured at the moment).
-It tries to provide the stronges guarantees that if your code compiles, the generated SQL is free of syntax (and some semantic) errors. 
+It tries to provide the strongest guarantees that if your code compiles, the generated SQL is free of syntax (and some semantic) errors. 
 Since you don't define the data model using classes representing rows, you have to do your own mapping though. In that sense, it is closer to ScalaQuery than Squeryl.
 The syntax is also just a bit closer to SQL since you can use symbols like >, <=, etc even with primitives.
 
@@ -77,6 +77,9 @@ val query = from(i)
 Mapping and Parsers
 -------------------
 
+Parsers allow you to create a composable mapping from a ResultSet to your own object. Aliases are handled nicely. 
+This is important if your query might be joining the same table twice or is using a different alias for a particular table.
+
 ```scala
 case class Account (
   id: Long,
@@ -92,13 +95,14 @@ case class User (
   account: Option[Account]
 )
 object User {
-  def parser (u: Users, a: Accounts) = (u.id ~ u.first_name ~ u.last_name ~ opt(Accounts.parser(a)) map {
+  def parser (u: Users, a: Accounts) = (u.id ~ u.first_name ~ u.last_name ~ opt(Accounts.parsers(a)) map {
     case id~first~last~manager => User(id, first+" "+last, manager)
   }
 }
 
 val query = from(users)
   .leftJoin(accounts on employees.manager_id === managers.id)
+  .select(User.parser.columns:_*)
   .map {User.parser _}
 
 val res: Seq[User] = query(con) 
