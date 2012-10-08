@@ -6,28 +6,27 @@ import scala.collection.mutable.ListBuffer
 import collection._, ast._
 
 object `package` {
-  implicit def colToExpr [T](col: Col[T]) = ColExpr(col)
-  implicit def tableToWrapped [T <: Table[_]] (t: T) = new TableWrapper(t)
+  implicit def tableToWrapped [T <: SqlTable[_]] (t: T) = new TableWrapper(t)
   implicit def baseToSqlLit [T](base: T)(implicit sqlType: SqlType[T,_]) = SqlLiteralExpr(base)
-  implicit def colToSqlLiteralExpr [T](col: Col[T]) = SqlLiteralExpr(col.sql)
   
-  implicit def toFrom (s: String) = new FromS(s)
-  implicit def toExpr (s: String) = new ExprS(s)
-  implicit def toJoin (s: String) = new JoinS(s)
-  implicit def toPredicate (s: String) = new PredicateS(s)
-  implicit def toOrder (s: String) = new OrderByS(s)
+  implicit def toFrom (s: String)         = new FromS(s)
+  implicit def toExpr (s: String)         = new ExprS(s)
+  implicit def toJoin (s: String)         = new JoinS(s)
+  implicit def toPredicate (s: String)    = new PredicateS(s)
+  implicit def toOrder (s: String)        = new OrderByS(s)
   
-  implicit def colToExprS (col: Col[_]) = new ExprS(col.sql)
-  implicit def tableToFrom (t: Table[_]) = new FromS(t.sql)
-  implicit def joinToJoin (j: Join) = new JoinS(j.sql)
+  implicit def colToExprS (col: SqlCol[_])  = new ExprS(col.sql)
+  implicit def tableToFrom (t: SqlTable[_]) = new FromS(t.sql)
+  implicit def joinToJoin (j: Join)         = new JoinS(j.sql)
+  implicit def predToPredicateS (pred: SqlExpr[Boolean]) = new PredicateS(pred.sql)
   implicit def orderingToOrder (o: SqlOrdering) = new OrderByS(o.sql)
 
   // starting point
   def from (table: FromS) = Query(table)
 }
 
-class TableWrapper [T <: Table[_]](t: T) {
-  def on (pred: SqlPredicate) = Join(t.sql, pred.sql)
+class TableWrapper [T <: SqlTable[_]](t: T) {
+  def on (pred: SqlExpr[Boolean]) = Join(t.sql, pred.sql)
 }
 
 case class Join (table: String, predicate: String) {
@@ -49,10 +48,11 @@ case class Query (
   orderBy:    Option[OrderByS] = None,
   params:     Seq[Any] = Nil
 ) {
-  def select (cols: ExprS*) = copy(cols = cols.toList)
-  def addCols (cols: ExprS*) = copy(cols = this.cols ++ cols.toList)
+  def select (cols: ExprS*)   = copy(cols = cols.toList)
+  def addCols (cols: ExprS*)  = copy(cols = this.cols ++ cols.toList)
   def innerJoin (join: JoinS) = copy(joins = joins ++ List(toJoin("INNER JOIN " + join.sql)))
-  def leftJoin (join: JoinS) = copy(joins = joins ++ List(toJoin("LEFT JOIN " + join.sql)))
+  def leftJoin (join: JoinS)  = copy(joins = joins ++ List(toJoin("LEFT JOIN " + join.sql)))
+  
   def where (predicate: PredicateS, params: Any*) = copy(predicate = Some(predicate), params = this.params ++ params.toList)
   //def where (predicate: Predicate) = copy(predicate = Some(predicate.sql), params = this.params ++ predicate.params)
   def addWhere (pred: PredicateS, params: Any*) = copy(predicate = predicate.map(p => toPredicate(p.sql + " AND " + pred.sql)).orElse(Some(pred)), params = this.params ++ params.toSeq)

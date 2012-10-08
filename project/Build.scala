@@ -8,7 +8,7 @@ object ScoopBuild extends Build {
     version       := "0.0.1-SNAPSHOT",
     crossScalaVersions := Seq("2.8.1", "2.9.1"),
     libraryDependencies ++= Seq(
-      "org.scalatest" %%  "scalatest"             % "2.0.M4"     % "test",
+      "org.scalatest" %%  "scalatest"             % "1.8"     % "test",
       "mysql"         %   "mysql-connector-java"  % "5.1.18"  % "test"
     )	  
   )

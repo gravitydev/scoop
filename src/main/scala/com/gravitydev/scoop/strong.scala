@@ -41,12 +41,6 @@ trait Query [X] extends (Connection => List[X]) {
   //def flatMap [T] (fn: X => Query[T])
 }
 
-trait Queryable[T] {
-  def as (alias: String): T
-  def as: String
-  def sql: String
-}
-
 private [strong] case class Selection [X <: SqlExprList](sel: X)  {
   override def toString = "Selection(" + (sel.toList map (_.sql) mkString(", ")) + ")"
   def sql = "SELECT " + (sel.toList map (_.sql) mkString(", "))
@@ -92,7 +86,7 @@ case class MappedQuery [X <: SqlExprList, T] (
     util.processQuery(query.sql) {rs =>
       val col = new (SqlExpr ~> Id) {
         def apply [T](x: SqlExpr[T]) = x match {
-          case x: ColExpr[_] => x.col.asInstanceOf[Col[T]](rs) // cast to regain erased type
+          case x: SqlCol[_] => x.asInstanceOf[SqlCol[T]](rs) // cast to regain erased type
         }
       }
       mapFn( query.select.sel.down(col) )

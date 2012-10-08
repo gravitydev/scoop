@@ -35,10 +35,15 @@ class ScoopSuite extends FunSuite {
     val u = users as "u"
     val i = issues as "i"
     
+    val x = baseToSqlLit("test")
+    
+    val y: ast.SqlExpr[Long] = i.id
+ 
     val test = from(u)
-      .innerJoin(i on i.id |=| u.id)
-      .orderBy(u.first_name desc, u.last_name asc)
-      .select(u.first_name, u.last_name)
+      .innerJoin (i on i.id === u.id)
+      .where (i.id === 1 or i.id >= i.id and i.id.isNull and (i.title like "%24"))
+      .orderBy (u.first_name desc, u.last_name asc)
+      .select (u.first_name, u.last_name)
     
     //val res = mapped(con)
     
