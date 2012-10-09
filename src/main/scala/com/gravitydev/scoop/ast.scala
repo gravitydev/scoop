@@ -8,6 +8,8 @@ sealed trait Sql {
 }
 
 sealed trait SqlExpr [X] extends Sql {
+  def params: List[_]
+  
   def === [T <% X] (v: SqlExpr[T]) = SqlInfixExpr[X,T,Boolean](this, v, "=")
   // alias
   def |=| [T <% X] (v: SqlExpr[T]) = === (v)
@@ -16,6 +18,8 @@ sealed trait SqlExpr [X] extends Sql {
   def <=  [T <% X] (v: SqlExpr[T]) = SqlInfixExpr[X,T,Boolean](this, v, "<=")
   def >   [T <% X] (v: SqlExpr[T]) = SqlInfixExpr[X,T,Boolean](this, v, ">")
   def >=  [T <% X] (v: SqlExpr[T]) = SqlInfixExpr[X,T,Boolean](this, v, ">=")
+  
+  def in [T <% X] (v: SqlExpr[Set[T]]) = SqlInfixExpr[X,Set[T],Boolean](this, v, "in")
   
   def and [V](v: SqlExpr[V]) = SqlInfixExpr[X,V,Boolean](this, v, "AND")
   def or  [V](v: SqlExpr[V]) = SqlInfixExpr[X,V,Boolean](this, v, "OR")
@@ -44,19 +48,23 @@ abstract class SqlTable [T <: SqlTable[T]](_tableName: String, companion: TableC
 }
 
 class SqlCol[T](val name: String)(implicit val table: SqlTable[_], sqlType: SqlType[T,_]) extends SqlExpr[T] {
+  val params = Nil
   def parse (rs: ResultSet, alias: String = null) = sqlType.get(Option(alias) getOrElse name)(rs)
   override def toString = "Col("+name+")"
   def sql = table.as + "." + name
 }
 
 case class SqlUnaryPostfixExpr [L,T](l: SqlExpr[L], op: String) extends SqlExpr [T] {
+  def params = l.params
   def sql = "(" + l.sql + " " + op + ")"
 }
 
 case class SqlInfixExpr [L,R,T](l: SqlExpr[L], r: SqlExpr[R], op: String) extends SqlExpr[T] {
+  def params = l.params ++ r.params
   def sql = "(" + l.sql + " " + op + " " + r.sql + ")"
 }
 
-case class SqlLiteralExpr [T] (v: T) extends SqlExpr[T] {
-  def sql = v.toString
+case class SqlLiteralExpr [T] (v: T)(implicit tp: SqlType[T,_]) extends SqlExpr[T] {
+  override def params = List(SqlSingleParam(v))
+  def sql = "?"
 }

@@ -5,10 +5,8 @@ import java.sql.ResultSet
 object `package` {
   type Table[T <: ast.SqlTable[T]] = ast.SqlTable[T]
   type TableCompanion[T <: Table[T]] = {def apply(s: String): T}
-  
-  private def getPrimitive [T](rs: ResultSet)(fn: ResultSet => T) = Option(fn(rs)) filter (_ => !rs.wasNull)
 
-  def opt [T](p: Parser[T]): Parser[Option[T]] = ParserWrapper(p, (opt: Option[T]) => Option(opt)) 
+  def opt [T](p: Parser[T]): Parser[Option[T]] = ParserWrapper(p, (opt: Option[T]) => Option(opt))
 
   implicit object SqlInt      extends SqlBasicType  [Int]     (_ getInt _)  
   implicit object SqlLong     extends SqlBasicType  [Long]    (_ getLong _)
@@ -19,7 +17,13 @@ object `package` {
   implicit def toColumnWrapper [X](c: ast.SqlCol[X]) = ColumnWrapper(c)
 }
 
-class SqlType[T,S](extract: (ResultSet, String) => S, from: S => T, to: T => S) {
+sealed trait SqlParam [T] {
+  val v: T
+}
+case class SqlSingleParam [T] (v: T)(implicit tp: SqlType[T,_]) extends SqlParam[T]
+case class SqlSetParam [T](v: Set[T])(implicit tp: SqlType[T,_]) extends SqlParam[Set[T]]
+
+abstract class SqlType[T,S](extract: (ResultSet, String) => S, from: S => T, to: T => S) {
   def get (name: String)(implicit rs: ResultSet) = Option(extract(rs, name)) filter {_ => !rs.wasNull} map from
 }
 

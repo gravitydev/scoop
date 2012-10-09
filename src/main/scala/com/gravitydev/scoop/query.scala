@@ -53,9 +53,10 @@ case class Query (
   def innerJoin (join: JoinS) = copy(joins = joins ++ List(toJoin("INNER JOIN " + join.sql)))
   def leftJoin (join: JoinS)  = copy(joins = joins ++ List(toJoin("LEFT JOIN " + join.sql)))
   
-  def where (predicate: PredicateS, params: Any*) = copy(predicate = Some(predicate), params = this.params ++ params.toList)
+  def where (predicate: PredicateS, params: SqlParam[_]*) = copy(predicate = Some(predicate), params = this.params ++ params.toList)
+  def where (predicate: SqlExpr[Boolean]) = copy(predicate = Some(predicate.sql), params = this.params ++ predicate.params)
   //def where (predicate: Predicate) = copy(predicate = Some(predicate.sql), params = this.params ++ predicate.params)
-  def addWhere (pred: PredicateS, params: Any*) = copy(predicate = predicate.map(p => toPredicate(p.sql + " AND " + pred.sql)).orElse(Some(pred)), params = this.params ++ params.toSeq)
+  def addWhere (pred: PredicateS, params: SqlParam[_]*) = copy(predicate = predicate.map(p => toPredicate(p.sql + " AND " + pred.sql)).orElse(Some(pred)), params = this.params ++ params.toSeq)
   def orderBy (order: OrderByS*) = copy(orderBy = Some( toOrder((order.toList.map(_.sql)).mkString(", "))) )
   
   def sql = 
@@ -91,7 +92,7 @@ case class Query (
       }
     }
   
-  override def toString = "Query("+sql+")"
+  override def toString = "Query(sql="+sql+", params=" + params +")"
   
   //def apply ()(implicit con: Connection) = map(rs => rs.)
   //def single ()(implicit con: Connection) = singleOpt().get
