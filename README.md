@@ -4,6 +4,8 @@ Scoop
 Scoop is a query construction toolkit for scala. It is a very early experiment. You could say it is a strange mix between Squeryl and Anorm.
 The main motivation is to provide a concise and practical solution that doesn't necessarily take complete control away from the SQL strings used. 
 
+Lots of inspiration was taken from squeryl, anorm, and the apocalisp blog.
+
 Installation
 ------------
 
@@ -107,9 +109,4 @@ val query = from(users)
 
 val res: Seq[User] = query(con) 
 ```
-
-Acknowledgements
-----------------
-
-Lots of inspiration was taken from squeryl, anorm, and the apocalisp blog.
 
