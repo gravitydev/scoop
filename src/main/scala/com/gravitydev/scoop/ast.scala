@@ -8,7 +8,7 @@ sealed trait Sql {
 }
 
 sealed trait SqlExpr [X] extends Sql {
-  def params: List[_]
+  def params: List[SqlSingleParam[_]]
   
   def === [T <% X] (v: SqlExpr[T]) = SqlInfixExpr[X,T,Boolean](this, v, "=")
   // alias
@@ -19,7 +19,10 @@ sealed trait SqlExpr [X] extends Sql {
   def >   [T <% X] (v: SqlExpr[T]) = SqlInfixExpr[X,T,Boolean](this, v, ">")
   def >=  [T <% X] (v: SqlExpr[T]) = SqlInfixExpr[X,T,Boolean](this, v, ">=")
   
-  def in [T <% X] (v: SqlExpr[Set[T]]) = SqlInfixExpr[X,Set[T],Boolean](this, v, "in")
+  // it would be nice to have a view bound here
+  def in [T <: X] (v: Set[T])(implicit tp: SqlType[T,_]) = {
+    SqlInfixExpr[X,Set[T],Boolean](this, SqlLiteralSetExpr(v), "in")
+  }
   
   def and [V](v: SqlExpr[V]) = SqlInfixExpr[X,V,Boolean](this, v, "AND")
   def or  [V](v: SqlExpr[V]) = SqlInfixExpr[X,V,Boolean](this, v, "OR")
@@ -67,4 +70,9 @@ case class SqlInfixExpr [L,R,T](l: SqlExpr[L], r: SqlExpr[R], op: String) extend
 case class SqlLiteralExpr [T] (v: T)(implicit tp: SqlType[T,_]) extends SqlExpr[T] {
   override def params = List(SqlSingleParam(v))
   def sql = "?"
+}
+
+case class SqlLiteralSetExpr [T] (v: Set[T])(implicit tp: SqlType[T,_]) extends SqlExpr[Set[T]] {
+  override def params = SqlSetParam(v).toList
+  def sql = v.toList.map(_ => "?").mkString("(", ", ", ")")
 }

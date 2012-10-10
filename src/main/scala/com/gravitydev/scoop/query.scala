@@ -46,17 +46,17 @@ case class Query (
   joins:      List[JoinS] = Nil,
   predicate:  Option[PredicateS] = None,
   orderBy:    Option[OrderByS] = None,
-  params:     Seq[Any] = Nil
+  params:     Seq[SqlSingleParam[_]] = Nil
 ) {
   def select (cols: ExprS*)   = copy(cols = cols.toList)
   def addCols (cols: ExprS*)  = copy(cols = this.cols ++ cols.toList)
   def innerJoin (join: JoinS) = copy(joins = joins ++ List(toJoin("INNER JOIN " + join.sql)))
   def leftJoin (join: JoinS)  = copy(joins = joins ++ List(toJoin("LEFT JOIN " + join.sql)))
   
-  def where (predicate: PredicateS, params: SqlParam[_]*) = copy(predicate = Some(predicate), params = this.params ++ params.toList)
+  def where (predicate: PredicateS, params: SqlSingleParam[_]*) = copy(predicate = Some(predicate), params = this.params ++ params.toList)
   def where (predicate: SqlExpr[Boolean]) = copy(predicate = Some(predicate.sql), params = this.params ++ predicate.params)
   //def where (predicate: Predicate) = copy(predicate = Some(predicate.sql), params = this.params ++ predicate.params)
-  def addWhere (pred: PredicateS, params: SqlParam[_]*) = copy(predicate = predicate.map(p => toPredicate(p.sql + " AND " + pred.sql)).orElse(Some(pred)), params = this.params ++ params.toSeq)
+  def addWhere (pred: PredicateS, params: SqlSingleParam[_]*) = copy(predicate = predicate.map(p => toPredicate(p.sql + " AND " + pred.sql)).orElse(Some(pred)), params = this.params ++ params.toSeq)
   def orderBy (order: OrderByS*) = copy(orderBy = Some( toOrder((order.toList.map(_.sql)).mkString(", "))) )
   
   def sql = 
@@ -66,14 +66,12 @@ case class Query (
     predicate.map(w => "WHERE " + w.sql + "\n").getOrElse("") + 
     orderBy.map("ORDER BY " + _.sql + "\n").getOrElse("")
     
-  def prepare ()(implicit con: Connection) = {
+  private def prepare ()(implicit con: Connection) = {
     val stmt = con.prepareStatement(sql)
-    for (p <- params.zipWithIndex) p match {
+    for (p <- params.map(x => x.v).zipWithIndex) p match {
       case (value:Int, i)         => stmt.setInt(i+1, value)
       case (value:Long, i)        => stmt.setLong(i+1, value)
       case (value:String, i)      => stmt.setString(i+1, value)
-      //case (value:DateTime, i)    => stmt.setTimestamp(i+1, new java.sql.Timestamp(value.getMillis))
-      //case (value:LocalDate, i)   => stmt.setDate(i+1, new java.sql.Date(value.toDateMidnight.getMillis))
       case (value:java.sql.Timestamp, i) => stmt.setTimestamp(i+1, value)
       case (value:java.sql.Date, i) => stmt.setDate(i+1, value)
       case (null, i)              => stmt.setNull(i+1, java.sql.Types.NULL)
@@ -85,6 +83,8 @@ case class Query (
   
   def map [B](process: ResultSet => B)(implicit c: Connection): List[B] =
     util.using (prepare()) {statement =>
+      for ((p, idx) <- params.zipWithIndex) p(statement, idx+1)
+      
       util.using (statement.executeQuery()) {results => 
         util.bmap(results.next) { 
           process(results)
@@ -92,7 +92,9 @@ case class Query (
       }
     }
   
-  override def toString = "Query(sql="+sql+", params=" + params +")"
+  override def toString = {
+    "Query(sql="+sql+", params=" + params.map(x => x.v + ":"+x.v.asInstanceOf[AnyRef].getClass.getName.stripPrefix("java.lang.")) +")"
+  }
   
   //def apply ()(implicit con: Connection) = map(rs => rs.)
   //def single ()(implicit con: Connection) = singleOpt().get

@@ -1,6 +1,6 @@
 package com.gravitydev.scoop
 
-import java.sql.ResultSet
+import java.sql.{ResultSet, PreparedStatement}
 
 object `package` {
   type Table[T <: ast.SqlTable[T]] = ast.SqlTable[T]
@@ -8,9 +8,9 @@ object `package` {
 
   def opt [T](p: Parser[T]): Parser[Option[T]] = ParserWrapper(p, (opt: Option[T]) => Option(opt))
 
-  implicit object SqlInt      extends SqlBasicType  [Int]     (_ getInt _)  
-  implicit object SqlLong     extends SqlBasicType  [Long]    (_ getLong _)
-  implicit object SqlString   extends SqlBasicType  [String]  (_ getString _)
+  implicit object SqlInt      extends SqlBasicType  [Int]     (_ getInt _, _ setInt (_,_))  
+  implicit object SqlLong     extends SqlBasicType  [Long]    (_ getLong _, _ setLong (_,_))
+  implicit object SqlString   extends SqlBasicType  [String]  (_ getString _, _ setString (_,_))
   //implicit object SqlBigDecimal extends SqlType     [java.math.BigDecimal, BigDecimal]  (_ getBigDecimal _, x => x, x => x)
   
   implicit def toColumnParser [X](c: ast.SqlCol[X]) = ColumnParser(c)
@@ -20,14 +20,18 @@ object `package` {
 sealed trait SqlParam [T] {
   val v: T
 }
-case class SqlSingleParam [T] (v: T)(implicit tp: SqlType[T,_]) extends SqlParam[T]
-case class SqlSetParam [T](v: Set[T])(implicit tp: SqlType[T,_]) extends SqlParam[Set[T]]
+case class SqlSingleParam [T] (v: T)(implicit val tp: SqlType[T,_]) extends SqlParam[T] {
+  def apply (stmt: PreparedStatement, idx: Int) = tp.apply(stmt, idx, v)
+}
+case class SqlSetParam [T](v: Set[T])(implicit tp: SqlType[T,_]) extends SqlParam[Set[T]] {
+  def toList = v.toList.map(x => SqlSingleParam(x))
+}
 
-abstract class SqlType[T,S](extract: (ResultSet, String) => S, from: S => T, to: T => S) {
+abstract class SqlType[T,S](extract: (ResultSet, String) => S, val apply: (PreparedStatement, Int, T) => Unit, from: S => T, to: T => S) {
   def get (name: String)(implicit rs: ResultSet) = Option(extract(rs, name)) filter {_ => !rs.wasNull} map from
 }
 
-class SqlBasicType [T] (extract: (ResultSet, String) => T) extends SqlType[T,T](extract, x=>x, x=>x)
+class SqlBasicType [T] (extract: (ResultSet, String) => T, apply: (PreparedStatement, Int, T) => Unit) extends SqlType[T,T](extract, apply, x=>x, x=>x)
 
 trait Parser[T] extends (ResultSet => T) {self =>
   private def resultSetInfo (rs: ResultSet) = {

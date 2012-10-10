@@ -38,6 +38,11 @@ class ScoopSuite extends FunSuite {
     val x = baseToSqlLit("test")
     
     val y: ast.SqlExpr[Long] = i.id
+    
+    
+    val res = from(u).where(u.id in Set(1L, 2L, 3L))
+    
+    println(res)
  
     val test = from(u)
       .innerJoin (i on i.id === u.id)
