@@ -8,7 +8,7 @@ import collection._, ast._
 object `package` {
   implicit def tableToWrapped [T <: SqlTable[_]] (t: T) = new TableWrapper(t)
   implicit def baseToSqlLit [T](base: T)(implicit sqlType: SqlType[T]) = SqlLiteralExpr(base)
-  
+
   implicit def toFrom (s: String)         = new FromS(s)
   implicit def toExpr (s: String)         = new ExprS(s)
   implicit def toJoin (s: String)         = new JoinS(s)
@@ -65,25 +65,6 @@ case class Query (
     (joins.map(_.sql).mkString("", "\n", "\n")) + 
     predicate.map(w => "WHERE " + w.sql + "\n").getOrElse("") + 
     orderBy.map("ORDER BY " + _.sql + "\n").getOrElse("")
-    
-  /*
-  private def prepare ()(implicit con: Connection) = {
-    val stmt = con.prepareStatement(sql)
-    /*
-    for (p <- params.map(x => x.v).zipWithIndex) p match {
-      case (value:Int, i)         => stmt.setInt(i+1, value)
-      case (value:Long, i)        => stmt.setLong(i+1, value)
-      case (value:String, i)      => stmt.setString(i+1, value)
-      case (value:java.sql.Timestamp, i) => stmt.setTimestamp(i+1, value)
-      case (value:java.sql.Date, i) => stmt.setDate(i+1, value)
-      case (null, i)              => stmt.setNull(i+1, java.sql.Types.NULL)
-      case (x: AnyRef, i)         => error("Unknown value type: " + x + " [" + x.getClass + "]")
-      case (x, i)                 => error("Unknown value type: " + x)
-    }
-    */
-    stmt
-  }
-  */
   
   def map [B](process: ResultSet => B)(implicit c: Connection): List[B] =
     util.using (c.prepareStatement(sql)) {statement =>
@@ -97,7 +78,7 @@ case class Query (
     }
   
   override def toString = {
-    "Query(sql="+sql+", params=" + params.map(x => x.v + ":"+x.v.asInstanceOf[AnyRef].getClass.getName.stripPrefix("java.lang.")) +")"
+    "Query(sql="+sql+", params=" + renderParams(params) +")"
   }
   
   //def apply ()(implicit con: Connection) = map(rs => rs.)

@@ -11,16 +11,11 @@ object `package` {
   implicit object SqlInt      extends SqlNativeType  [Int]     (Types.INTEGER,  _ getInt _,     _ setInt (_,_))  
   implicit object SqlLong     extends SqlNativeType  [Long]    (Types.BIGINT,   _ getLong _,    _ setLong (_,_))
   implicit object SqlString   extends SqlNativeType  [String]  (Types.VARCHAR,  _ getString _,  _ setString (_,_))
-  //implicit object SqlBigDecimal extends SqlType     [java.math.BigDecimal, BigDecimal]  (_ getBigDecimal _, x => x, x => x)
-  
-  implicit def sqlNullable [T](implicit tp: SqlType[T]) = new SqlType [Option[T]] {
-    def tpe = tp.tpe
-    def extract (rs: ResultSet, name: String): Option[T] = if (rs.wasNull) None else Some(tp.extract(rs, name))
-    def apply (stmt: PreparedStatement, idx: Int, value: Option[T]) = value map {tp.apply(stmt, idx, _)} getOrElse stmt.setNull(idx, tp.tpe)
-  }
   
   implicit def toColumnParser [X](c: ast.SqlCol[X]) = ColumnParser(c)
   implicit def toColumnWrapper [X](c: ast.SqlCol[X]) = ColumnWrapper(c)
+  
+  private[scoop] def renderParams (params: Seq[SqlSingleParam[_,_]]) = params.map(x => x.v + ":"+x.v.asInstanceOf[AnyRef].getClass.getName.stripPrefix("java.lang."))
 }
 
 trait SqlType [T] {

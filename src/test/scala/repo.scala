@@ -1,7 +1,6 @@
 import com.gravitydev.scoop._
 
 object Repo {
-  case class IssueStatus(id: Int)
   
   implicit object SqlIssueStatus extends SqlCustomType [IssueStatus, Int] (IssueStatus.apply _, _.id)
   
@@ -12,10 +11,11 @@ object Repo {
     val title       = col[String]       ("title")
     val description = col[String]       ("description")
     val status      = col[IssueStatus]  ("status")
-    val assigned_to = col[Option[Long]] ("assigned_to")(sqlNullable)
-    //val reason      = col[IssueReason]  ("reason")
-    //val severity    = col[IssueSeverity]("severity")
-    //val reported_on = col[DateTime]     ("reported_date")
+    val reported_by = col[Long]         ("reported_by")
+    val assigned_to = col[Long]         ("assigned_to")   nullable
+    val release_id  = col[Long]         ("release_id")    nullable
+    
+    val * = id ~ project_id
   }
   def issues = Issues("i")
   
@@ -26,4 +26,49 @@ object Repo {
     val email       = col[String]       ("email")
   }
   def users = Users("u")
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  case class IssueStatus(id: Int)
+  
+  case class User (
+    id:   Long,
+    name: String
+  )
+  
+  case class Issue (
+    id:       Long,
+    status:   IssueStatus,
+    reporter: User,
+    assignee: Option[User]
+  )
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  object Parsers {
+    def user (u: Users) = u.id ~ u.first_name ~ u.last_name map {case i~f~l => User(i,f+" "+l)}
+    
+    def issue (i: Issues, r: Users, a: Users) = i.id ~ i.status ~ user(r).as(prefix="reporter_") ~ opt(user(a).as(prefix="assignee_")) map {case i~s~rep~assignee => Issue(i,s,rep,assignee)}
+  }
+  
 }
