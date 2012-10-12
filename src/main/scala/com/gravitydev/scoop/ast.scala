@@ -8,7 +8,7 @@ sealed trait Sql {
 }
 
 sealed trait SqlExpr [X] extends Sql {
-  def params: List[SqlSingleParam[_]]
+  def params: List[SqlSingleParam[_,_]]
   
   def === [T <% X] (v: SqlExpr[T]) = SqlInfixExpr[X,T,Boolean](this, v, "=")
   // alias
@@ -20,7 +20,7 @@ sealed trait SqlExpr [X] extends Sql {
   def >=  [T <% X] (v: SqlExpr[T]) = SqlInfixExpr[X,T,Boolean](this, v, ">=")
   
   // it would be nice to have a view bound here
-  def in [T <: X] (v: Set[T])(implicit tp: SqlType[T,_]) = {
+  def in [T <: X] (v: Set[T])(implicit tp: SqlType[T]) = {
     SqlInfixExpr[X,Set[T],Boolean](this, SqlLiteralSetExpr(v), "in")
   }
   
@@ -44,13 +44,13 @@ abstract class SqlTable [T <: SqlTable[T]](_tableName: String, companion: TableC
   val tableName = Option(_tableName) getOrElse companion.getClass.getCanonicalName.split('.').last.stripSuffix("$")
   def as: String
   implicit def _self = this
-  def col[T](name: String)(implicit st: SqlType[T,_]) = new SqlCol[T](name)
-  def col[T](name: Symbol)(implicit st: SqlType[T,_]) = new SqlCol[T](name.name)
+  def col[T](name: String)(implicit st: SqlType[T]) = new SqlCol[T](name)
+  def col[T](name: Symbol)(implicit st: SqlType[T]) = new SqlCol[T](name.name)
   def as (alias: String): T = companion(alias)
   def sql = tableName + " as " + as
 }
 
-class SqlCol[T](val name: String)(implicit val table: SqlTable[_], sqlType: SqlType[T,_]) extends SqlExpr[T] {
+class SqlCol[T](val name: String)(implicit val table: SqlTable[_], sqlType: SqlType[T]) extends SqlExpr[T] {
   val params = Nil
   def parse (rs: ResultSet, alias: String = null) = sqlType.get(Option(alias) getOrElse name)(rs)
   override def toString = "Col("+name+")"
@@ -67,12 +67,12 @@ case class SqlInfixExpr [L,R,T](l: SqlExpr[L], r: SqlExpr[R], op: String) extend
   def sql = "(" + l.sql + " " + op + " " + r.sql + ")"
 }
 
-case class SqlLiteralExpr [T] (v: T)(implicit tp: SqlType[T,_]) extends SqlExpr[T] {
+case class SqlLiteralExpr [T] (v: T)(implicit tp: SqlType[T]) extends SqlExpr[T] {
   override def params = List(SqlSingleParam(v))
   def sql = "?"
 }
 
-case class SqlLiteralSetExpr [T] (v: Set[T])(implicit tp: SqlType[T,_]) extends SqlExpr[Set[T]] {
+case class SqlLiteralSetExpr [T] (v: Set[T])(implicit tp: SqlType[T]) extends SqlExpr[Set[T]] {
   override def params = SqlSetParam(v).toList
   def sql = v.toList.map(_ => "?").mkString("(", ", ", ")")
 }

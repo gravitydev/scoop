@@ -1,6 +1,6 @@
 package com.gravitydev.scoop
 
-import java.sql.{ResultSet, PreparedStatement}
+import java.sql.{ResultSet, PreparedStatement, Types}
 
 object `package` {
   type Table[T <: ast.SqlTable[T]] = ast.SqlTable[T]
@@ -8,30 +8,49 @@ object `package` {
 
   def opt [T](p: Parser[T]): Parser[Option[T]] = ParserWrapper(p, (opt: Option[T]) => Option(opt))
 
-  implicit object SqlInt      extends SqlBasicType  [Int]     (_ getInt _, _ setInt (_,_))  
-  implicit object SqlLong     extends SqlBasicType  [Long]    (_ getLong _, _ setLong (_,_))
-  implicit object SqlString   extends SqlBasicType  [String]  (_ getString _, _ setString (_,_))
+  implicit object SqlInt      extends SqlNativeType  [Int]     (Types.INTEGER,  _ getInt _,     _ setInt (_,_))  
+  implicit object SqlLong     extends SqlNativeType  [Long]    (Types.BIGINT,   _ getLong _,    _ setLong (_,_))
+  implicit object SqlString   extends SqlNativeType  [String]  (Types.VARCHAR,  _ getString _,  _ setString (_,_))
   //implicit object SqlBigDecimal extends SqlType     [java.math.BigDecimal, BigDecimal]  (_ getBigDecimal _, x => x, x => x)
+  
+  implicit def sqlNullable [T](implicit tp: SqlType[T]) = new SqlType [Option[T]] {
+    def tpe = tp.tpe
+    def extract (rs: ResultSet, name: String): Option[T] = if (rs.wasNull) None else Some(tp.extract(rs, name))
+    def apply (stmt: PreparedStatement, idx: Int, value: Option[T]) = value map {tp.apply(stmt, idx, _)} getOrElse stmt.setNull(idx, tp.tpe)
+  }
   
   implicit def toColumnParser [X](c: ast.SqlCol[X]) = ColumnParser(c)
   implicit def toColumnWrapper [X](c: ast.SqlCol[X]) = ColumnWrapper(c)
 }
 
+trait SqlType [T] {
+  def tpe: Int // jdbc sql type
+  def extract (rs: ResultSet, name: String): T
+  def apply (stmt: PreparedStatement, idx: Int, value: T): Unit
+  
+  def get (name: String)(implicit rs: ResultSet) = Option(extract(rs, name)) filter {_ => !rs.wasNull}
+}
+  
+abstract class SqlNativeType[T] (val tpe: Int, get: (ResultSet, String) => T, set: (PreparedStatement, Int, T) => Unit) extends SqlType [T] {
+  def extract (rs: ResultSet, name: String): T = get(rs, name)
+  def apply (stmt: PreparedStatement, idx: Int, value: T): Unit = set(stmt, idx, value)
+}
+abstract class SqlCustomType[T,N] (from: N => T, to: T => N)(implicit nt: SqlNativeType[N]) extends SqlType[T] {
+  def tpe = nt.tpe
+  def extract (rs: ResultSet, name: String): T = from( nt.extract(rs, name) )
+  def apply (stmt: PreparedStatement, idx: Int, value: T): Unit = nt.apply(stmt, idx, to(value))
+}
+
 sealed trait SqlParam [T] {
   val v: T
 }
-case class SqlSingleParam [T] (v: T)(implicit val tp: SqlType[T,_]) extends SqlParam[T] {
+
+case class SqlSingleParam [T,S] (v: T)(implicit val tp: SqlType[T]) extends SqlParam[T] {
   def apply (stmt: PreparedStatement, idx: Int) = tp.apply(stmt, idx, v)
 }
-case class SqlSetParam [T](v: Set[T])(implicit tp: SqlType[T,_]) extends SqlParam[Set[T]] {
+case class SqlSetParam [T](v: Set[T])(implicit tp: SqlType[T]) extends SqlParam[Set[T]] {
   def toList = v.toList.map(x => SqlSingleParam(x))
 }
-
-abstract class SqlType[T,S](extract: (ResultSet, String) => S, val apply: (PreparedStatement, Int, T) => Unit, from: S => T, to: T => S) {
-  def get (name: String)(implicit rs: ResultSet) = Option(extract(rs, name)) filter {_ => !rs.wasNull} map from
-}
-
-class SqlBasicType [T] (extract: (ResultSet, String) => T, apply: (PreparedStatement, Int, T) => Unit) extends SqlType[T,T](extract, apply, x=>x, x=>x)
 
 trait Parser[T] extends (ResultSet => T) {self =>
   private def resultSetInfo (rs: ResultSet) = {
@@ -46,11 +65,11 @@ trait Parser[T] extends (ResultSet => T) {self =>
   def apply (rs: ResultSet): T = parse(rs) getOrElse error("Could not parse result set: " + resultSetInfo(rs) + " with parser: " + self.name)
   def parse (rs: ResultSet): Option[T]
   def ~ [X](p: Parser[X]) = JoinParser(this, p)
-  def as (table: String = null, prefix: String = null): Parser[T]
+  def as (prefix: String = null): Parser[T]
   def columns: List[query.ExprS]
   def map [X](fn: T => X): Parser[X] = new Parser [X] {
     def columns = self.columns
-    def as (table: String = null, prefix: String = null) = self.as(table, prefix) map fn
+    def as (prefix: String = null) = self.as(prefix) map fn
     def parse (rs: ResultSet) = self.parse(rs) map fn
     def name = "Parser(" + self.name + ")"
   }
@@ -63,7 +82,7 @@ case class JoinParser [L,R] (l: Parser[L], r: Parser[R]) extends Parser [L~R] {
     y <- r parse rs
   } yield new ~ (x,y)
   
-  def as (table: String = null, prefix: String = null) = l.as(table,prefix) ~ r.as(table,prefix)
+  def as (prefix: String = null) = l.as(prefix) ~ r.as(prefix)
   def columns = l.columns ++ r.columns
 }
 
@@ -72,15 +91,15 @@ case class ~ [L,R] (l: L, r: R)
 case class ParserWrapper [T,X] (p: Parser[T], fn: Option[T] => Option[X]) extends Parser[X] {
   def name = "ParserWrapper(" + p.name + ")"
   def columns = p.columns
-  def as (table: String = null, prefix: String = null) = ParserWrapper(p.as(table, prefix), fn)
+  def as (prefix: String = null) = ParserWrapper(p.as(prefix), fn)
   def parse (rs: ResultSet) = fn(p.parse(rs))
 }
 
-case class ColumnParser[T](column: ast.SqlCol[T], tableAlias: Option[String] = None, pf: String = "") extends Parser[T] {
+case class ColumnParser[T](column: ast.SqlCol[T], pf: String = "") extends Parser[T] {
   def name = pf+column.name
   def parse (rs: ResultSet) = column.parse(rs, pf+column.name)
-  def as (table: String = null, prefix: String = null) = new ColumnParser(column, Option(table), Option(prefix) getOrElse "")
-  def columns = List((tableAlias map {_+"."+column.name} getOrElse column.sql) + (if (pf != "") " as " + pf + column.name else ""))
+  def as (prefix: String = null) = new ColumnParser(column, Option(prefix) getOrElse "")
+  def columns = List(column.sql + (if (pf != "") " as " + pf + column.name else ""))
 }
 
 abstract class SqlOrder (val sql: String)

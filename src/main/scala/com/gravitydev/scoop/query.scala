@@ -7,7 +7,7 @@ import collection._, ast._
 
 object `package` {
   implicit def tableToWrapped [T <: SqlTable[_]] (t: T) = new TableWrapper(t)
-  implicit def baseToSqlLit [T](base: T)(implicit sqlType: SqlType[T,_]) = SqlLiteralExpr(base)
+  implicit def baseToSqlLit [T](base: T)(implicit sqlType: SqlType[T]) = SqlLiteralExpr(base)
   
   implicit def toFrom (s: String)         = new FromS(s)
   implicit def toExpr (s: String)         = new ExprS(s)
@@ -46,17 +46,17 @@ case class Query (
   joins:      List[JoinS] = Nil,
   predicate:  Option[PredicateS] = None,
   orderBy:    Option[OrderByS] = None,
-  params:     Seq[SqlSingleParam[_]] = Nil
+  params:     Seq[SqlSingleParam[_,_]] = Nil
 ) {
   def select (cols: ExprS*)   = copy(cols = cols.toList)
   def addCols (cols: ExprS*)  = copy(cols = this.cols ++ cols.toList)
   def innerJoin (join: JoinS) = copy(joins = joins ++ List(toJoin("INNER JOIN " + join.sql)))
   def leftJoin (join: JoinS)  = copy(joins = joins ++ List(toJoin("LEFT JOIN " + join.sql)))
   
-  def where (predicate: PredicateS, params: SqlSingleParam[_]*) = copy(predicate = Some(predicate), params = this.params ++ params.toList)
+  def where (predicate: PredicateS, params: SqlSingleParam[_,_]*) = copy(predicate = Some(predicate), params = this.params ++ params.toList)
   def where (predicate: SqlExpr[Boolean]) = copy(predicate = Some(predicate.sql), params = this.params ++ predicate.params)
   //def where (predicate: Predicate) = copy(predicate = Some(predicate.sql), params = this.params ++ predicate.params)
-  def addWhere (pred: PredicateS, params: SqlSingleParam[_]*) = copy(predicate = predicate.map(p => toPredicate(p.sql + " AND " + pred.sql)).orElse(Some(pred)), params = this.params ++ params.toSeq)
+  def addWhere (pred: PredicateS, params: SqlSingleParam[_,_]*) = copy(predicate = predicate.map(p => toPredicate(p.sql + " AND " + pred.sql)).orElse(Some(pred)), params = this.params ++ params.toSeq)
   def orderBy (order: OrderByS*) = copy(orderBy = Some( toOrder((order.toList.map(_.sql)).mkString(", "))) )
   
   def sql = 
@@ -66,8 +66,10 @@ case class Query (
     predicate.map(w => "WHERE " + w.sql + "\n").getOrElse("") + 
     orderBy.map("ORDER BY " + _.sql + "\n").getOrElse("")
     
+  /*
   private def prepare ()(implicit con: Connection) = {
     val stmt = con.prepareStatement(sql)
+    /*
     for (p <- params.map(x => x.v).zipWithIndex) p match {
       case (value:Int, i)         => stmt.setInt(i+1, value)
       case (value:Long, i)        => stmt.setLong(i+1, value)
@@ -78,11 +80,13 @@ case class Query (
       case (x: AnyRef, i)         => error("Unknown value type: " + x + " [" + x.getClass + "]")
       case (x, i)                 => error("Unknown value type: " + x)
     }
+    */
     stmt
   }
+  */
   
   def map [B](process: ResultSet => B)(implicit c: Connection): List[B] =
-    util.using (prepare()) {statement =>
+    util.using (c.prepareStatement(sql)) {statement =>
       for ((p, idx) <- params.zipWithIndex) p(statement, idx+1)
       
       util.using (statement.executeQuery()) {results => 
