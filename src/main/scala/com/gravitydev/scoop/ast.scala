@@ -53,7 +53,7 @@ abstract class SqlTable [T <: SqlTable[T]](_tableName: String, companion: TableC
 
 class SqlCol[T](val name: String)(implicit val table: SqlTable[_], sqlType: SqlType[T]) extends SqlExpr[T] {
   val params = Nil
-  def parse (rs: ResultSet, alias: String = null) = sqlType.get(Option(alias) getOrElse name)(rs)
+  def parse (rs: ResultSet, alias: String = null) = sqlType.parse(rs, Option(alias) getOrElse name)
   override def toString = "Col("+name+")"
   def sql = table.as + "." + name
   
@@ -61,6 +61,7 @@ class SqlCol[T](val name: String)(implicit val table: SqlTable[_], sqlType: SqlT
 }
 
 class SqlNullableCol[T](col: SqlCol[T]) extends SqlExpr[T] {
+  val name = col.name
   def params = col.params
   def sql = col.sql
   def parse (rs: ResultSet, alias: String = null) = Some(col.parse(rs, alias))

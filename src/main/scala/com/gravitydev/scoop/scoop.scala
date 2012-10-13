@@ -1,6 +1,6 @@
 package com.gravitydev.scoop
 
-import java.sql.{ResultSet, PreparedStatement, Types}
+import java.sql.{ResultSet, PreparedStatement, Types, Timestamp}
 
 object `package` {
   type Table[T <: ast.SqlTable[T]] = ast.SqlTable[T]
@@ -8,11 +8,13 @@ object `package` {
 
   def opt [T](p: Parser[T]): Parser[Option[T]] = ParserWrapper(p, (opt: Option[T]) => Option(opt))
 
-  implicit object SqlInt      extends SqlNativeType  [Int]     (Types.INTEGER,  _ getInt _,     _ setInt (_,_))  
-  implicit object SqlLong     extends SqlNativeType  [Long]    (Types.BIGINT,   _ getLong _,    _ setLong (_,_))
-  implicit object SqlString   extends SqlNativeType  [String]  (Types.VARCHAR,  _ getString _,  _ setString (_,_))
+  implicit object SqlInt        extends SqlNativeType [Int]       (Types.INTEGER,   _ getInt _,       _ setInt (_,_))  
+  implicit object SqlLong       extends SqlNativeType [Long]      (Types.BIGINT,    _ getLong _,      _ setLong (_,_))
+  implicit object SqlString     extends SqlNativeType [String]    (Types.VARCHAR,   _ getString _,    _ setString (_,_))
+  implicit object SqlTimestamp  extends SqlNativeType [Timestamp] (Types.TIMESTAMP, _ getTimestamp _, _ setTimestamp (_,_))
   
   implicit def toColumnParser [X](c: ast.SqlCol[X]) = ColumnParser(c)
+  implicit def toNullableColumnParser [X](c: ast.SqlNullableCol[X]) = NullableColumnParser(c)
   implicit def toColumnWrapper [X](c: ast.SqlCol[X]) = ColumnWrapper(c)
   
   private[scoop] def renderParams (params: Seq[SqlSingleParam[_,_]]) = params.map(x => x.v + ":"+x.v.asInstanceOf[AnyRef].getClass.getName.stripPrefix("java.lang."))
@@ -20,19 +22,17 @@ object `package` {
 
 trait SqlType [T] {
   def tpe: Int // jdbc sql type
-  def extract (rs: ResultSet, name: String): T
   def apply (stmt: PreparedStatement, idx: Int, value: T): Unit
-  
-  def get (name: String)(implicit rs: ResultSet) = Option(extract(rs, name)) filter {_ => !rs.wasNull}
+  def parse (rs: ResultSet, name: String): Option[T]
 }
   
 abstract class SqlNativeType[T] (val tpe: Int, get: (ResultSet, String) => T, set: (PreparedStatement, Int, T) => Unit) extends SqlType [T] {
-  def extract (rs: ResultSet, name: String): T = get(rs, name)
   def apply (stmt: PreparedStatement, idx: Int, value: T): Unit = set(stmt, idx, value)
+  def parse (rs: ResultSet, name: String) = Option(get(rs, name)) filter {_ => !rs.wasNull}
 }
 abstract class SqlCustomType[T,N] (from: N => T, to: T => N)(implicit nt: SqlNativeType[N]) extends SqlType[T] {
   def tpe = nt.tpe
-  def extract (rs: ResultSet, name: String): T = from( nt.extract(rs, name) )
+  def parse (rs: ResultSet, name: String) = nt.parse(rs, name) map from
   def apply (stmt: PreparedStatement, idx: Int, value: T): Unit = nt.apply(stmt, idx, to(value))
 }
 
@@ -94,6 +94,13 @@ case class ColumnParser[T](column: ast.SqlCol[T], pf: String = "") extends Parse
   def name = pf+column.name
   def parse (rs: ResultSet) = column.parse(rs, pf+column.name)
   def as (prefix: String = null) = new ColumnParser(column, Option(prefix) getOrElse "")
+  def columns = List(column.sql + (if (pf != "") " as " + pf + column.name else ""))
+}
+
+case class NullableColumnParser[T](column: ast.SqlNullableCol[T], pf: String = "") extends Parser[Option[T]] {
+  def name = pf+column.name
+  def parse (rs: ResultSet) = column.parse(rs, pf+column.name)
+  def as (prefix: String = null) = new NullableColumnParser(column, Option(prefix) getOrElse "")
   def columns = List(column.sql + (if (pf != "") " as " + pf + column.name else ""))
 }
 
