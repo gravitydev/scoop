@@ -5,6 +5,7 @@ import ast._, collection._
 import java.sql.Connection
 
 object `package` {
+  /*
   // shortcuts
   type C = TransactionContext
   type T = Table[_]
@@ -17,8 +18,9 @@ object `package` {
   def select [A](x: SqlExpr[A]) = Selection(x :^: KNil)
   def select [A,B](a: SqlExpr[A], b: SqlExpr[B]) = Selection(a :^: b :^: KNil)
   def select [A,B,C](a: SqlExpr[A], b: SqlExpr[B], c: SqlExpr[C]) = Selection(a :^: b :^: c :^: KNil)
+  */
 }
-
+/*
 trait TransactionContext {
   private val names = scala.collection.mutable.Set[String]()
 
@@ -93,3 +95,4 @@ case class MappedQuery [X <: SqlExprList, T] (
     }
   }
 }
+*/

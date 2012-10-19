@@ -32,28 +32,37 @@ class ScoopSuite extends FunSuite {
   
   test ("query API") {
     import query._
+
+    case class User (first: String, last: String)
+    case class Issue (id: Long, assignee: User)
     
-    val u = users as "u"
+    def userParser (u: Users) = u.first_name ~ u.last_name >> User.apply
+    
+    val u = users as "u" prefix "reporter_"
     val i = issues as "i"
     
-    val y: ast.SqlExpr[Long] = i.id
-    
-    //val j = issues.assigned_to === 1L
-    
-    val res = from(u).where(u.id in Set(1L, 2L, 3L))
+    val userP = userParser(u)
+    val issueParser = i.id ~ userP >> Issue.apply
     
     
-    println(res)
+    println("USER COLS")
+    println(issueParser.columns.map(_.sql))
+    println("DONE")
  
-    val test = from(u)
-      .innerJoin (i on i.id === u.id)
-      .where (i.id === 1L or i.id >= i.id and i.id.isNull and (i.title like "%24"))
+    val q = from(i)
+      .innerJoin (u on i.reported_by === u.id)
+      .where (u.first_name === "alvaro")
       .orderBy (u.first_name desc, u.last_name asc)
-      .select (u.first_name, u.last_name)
+      .select (issueParser.columns:_*)
+      
+    println(q)
+      
+    val test = q map issueParser
     
     //val res = mapped(con)
     
     println(test)
     //println(res)
+    
   }
 }

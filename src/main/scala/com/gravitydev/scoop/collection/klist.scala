@@ -22,6 +22,8 @@ sealed class KNil extends KList[Nothing, HNil] {
   def toList = Nil
   
   def down (f: Nothing ~> Id) = HNil
+  
+  def append [M[_], H](h: M[H]) = KCons(h, this)
 }
 
 object KNil extends KNil
@@ -30,4 +32,3 @@ object KList {
   // nicer alias for pattern matching
   val :^: = KCons
 }
-

@@ -44,28 +44,34 @@ trait Queryable[T] {
 abstract class SqlTable [T <: SqlTable[T]](_tableName: String, companion: TableCompanion[T]) extends Queryable[T] {
   val tableName = Option(_tableName) getOrElse companion.getClass.getCanonicalName.split('.').last.stripSuffix("$")
   def as: String
+  def pf: String
   implicit def _self = this
-  def col[T](name: String)(implicit st: SqlType[T]) = new SqlCol[T](name)
-  def col[T](name: Symbol)(implicit st: SqlType[T]) = new SqlCol[T](name.name)
-  def as (alias: String): T = companion(alias)
+  def col[T](name: String, cast: String = null)(implicit st: SqlType[T]) = new SqlCol[T](name, Option(cast))
+  def col[T](name: Symbol)(implicit st: SqlType[T]) = new SqlCol[T](name.name, None)
+  def as (alias: String): T = companion(alias, pf)
+  
+  // prefix to use for columns
+  def prefix (_pf: String): T = companion(as, _pf)
+  
   def sql = tableName + " as " + as
 }
 
-class SqlCol[T](val name: String)(implicit val table: SqlTable[_], sqlType: SqlType[T]) extends SqlExpr[T] {
+class SqlCol[T](val name: String, val cast: Option[String])(implicit val table: SqlTable[_], sqlType: SqlType[T]) extends SqlExpr[T] {
   val params = Nil
-  def parse (rs: ResultSet, alias: String = null) = sqlType.parse(rs, Option(alias) getOrElse name)
-  override def toString = "Col("+name+")"
-  def sql = table.as + "." + name
-  
+  def parse (rs: ResultSet) = sqlType.parse(rs, alias)
+  override def toString = "Col(" + selectSql + ")"
   def nullable = new SqlNullableCol(this)
+  def alias = table.pf + name
+  def sql = table.as + "." + name + cast.map("::"+_).getOrElse("")
+  def selectSql = sql + cast.map("::"+_).getOrElse("") + (if (table.pf!="") " as " + alias else "")
 }
 
 class SqlNullableCol[T](col: SqlCol[T]) extends SqlExpr[T] {
   val name = col.name
   def params = col.params
   def sql = col.sql
-  def parse (rs: ResultSet, alias: String = null) = Some(col.parse(rs, alias))
-  override def toString = "NullableCol("+col.name+")"
+  def parse (rs: ResultSet) = Some(col parse rs)
+  override def toString = "NullableCol("+col.selectSql+")"
 }
 
 case class SqlUnaryPostfixExpr [L,T](l: SqlExpr[L], op: String) extends SqlExpr [T] {
