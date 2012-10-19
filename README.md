@@ -83,10 +83,10 @@ val r = users as "reporter" prefix "reporter_"
 
 val col = r.id          // will generate: "reporter.id as reporter_id"
 val col = r.first_name  // will generate: "reporter.id as reporter_first_name"
+```
 
 Mapping and Parsers
 -------------------
-```
 
 Parsers allow you to create a composable mapping from a ResultSet to your own object. Aliases are handled nicely. 
 This is important if your query might be joining the same table twice or is using a different alias for a particular table.
