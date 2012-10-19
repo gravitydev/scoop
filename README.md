@@ -111,6 +111,9 @@ object Parsers {
   def user (u: Users, a: Accounts) = u.id ~ u.first_name ~ u.last_name ~ opt(Accounts.parsers(a)) >> User.apply
 }
 
+// instantiate a parser by specifying the tables it should use
+// the tables can be configured with aliases and/or column prefixes
+// this makes the definition of the parser general, but the instantiation custom to the query
 val userParser = Parsers.user( users, accounts )
 
 val query = from(users)
