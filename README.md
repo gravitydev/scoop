@@ -108,7 +108,9 @@ case class User (
 object Parsers {
   // make sure the case class has the correct number and type of parameters
   def account (a: Account) = a.id ~ a.name >> Account.apply
-  def user (u: Users, a: Accounts) = u.id ~ u.first_name ~ u.last_name ~ opt(Accounts.parsers(a)) >> User.apply
+
+  // you can use an existing parser when defining a new one:
+  def user (u: Users, a: Accounts) = u.id ~ u.first_name ~ u.last_name ~ opt(account(a)) >> User.apply
 }
 
 // instantiate a parser by specifying the tables it should use

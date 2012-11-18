@@ -1,6 +1,6 @@
 package com.gravitydev.scoop
 
-import java.sql.{ResultSet, PreparedStatement, Types, Timestamp}
+import java.sql.{ResultSet, PreparedStatement, Types, Timestamp, Date}
 
 object `package` {
   type Table[T <: ast.SqlTable[T]] = ast.SqlTable[T]
@@ -14,17 +14,20 @@ object `package` {
     }
   }
 
-  implicit object int        extends SqlNativeType [Int]       (Types.INTEGER,   _ getInt _,       _ setInt (_,_))  
-  implicit object long       extends SqlNativeType [Long]      (Types.BIGINT,    _ getLong _,      _ setLong (_,_))
-  implicit object string     extends SqlNativeType [String]    (Types.VARCHAR,   _ getString _,    _ setString (_,_))
-  implicit object timestamp  extends SqlNativeType [Timestamp] (Types.TIMESTAMP, _ getTimestamp _, _ setTimestamp (_,_))
-  implicit object boolean    extends SqlNativeType [Boolean]   (Types.BOOLEAN,   _ getBoolean _,   _ setBoolean (_,_))
+  implicit object int        extends SqlNativeType [Int]          (Types.INTEGER,   _ getInt _,       _ setInt (_,_))  
+  implicit object long       extends SqlNativeType [Long]         (Types.BIGINT,    _ getLong _,      _ setLong (_,_))
+  implicit object double     extends SqlNativeType [Double]       (Types.DOUBLE,    _ getDouble _,    _ setDouble (_,_))
+  implicit object string     extends SqlNativeType [String]       (Types.VARCHAR,   _ getString _,    _ setString (_,_))
+  implicit object timestamp  extends SqlNativeType [Timestamp]    (Types.TIMESTAMP, _ getTimestamp _, _ setTimestamp (_,_))
+  implicit object date       extends SqlNativeType [Date]         (Types.DATE,      _ getDate _,      _ setDate (_,_))
+  implicit object boolean    extends SqlNativeType [Boolean]      (Types.BOOLEAN,   _ getBoolean _,   _ setBoolean (_,_))
+  implicit object decimal    extends SqlNativeType [scala.math.BigDecimal] (Types.DECIMAL, (rs, idx) => scala.math.BigDecimal(rs.getBigDecimal(idx)), (rs, idx, value) => rs.setBigDecimal(idx, value.underlying))
   
-  implicit def toColumnParser [X](c: ast.SqlCol[X]) = new ColumnParser(c)
+  implicit def toColumnParser [X](c: ast.SqlNonNullableCol[X]) = new ColumnParser(c)
   implicit def toNullableColumnParser [X](c: ast.SqlNullableCol[X]) = new NullableColumnParser(c)
   implicit def toColumnWrapper [X](c: ast.SqlCol[X]) = ColumnWrapper(c)
   
-  private[scoop] def renderParams (params: Seq[SqlSingleParam[_,_]]) = params.map(x => x.v + ":"+x.v.asInstanceOf[AnyRef].getClass.getName.stripPrefix("java.lang."))
+  private[scoop] def renderParams (params: Seq[SqlParam[_]]) = params.map(x => x.v + ":"+x.v.asInstanceOf[AnyRef].getClass.getName.stripPrefix("java.lang."))
 }
 
 private [scoop] sealed trait ParseResult[+T] {
@@ -32,10 +35,18 @@ private [scoop] sealed trait ParseResult[+T] {
     case Success(v) => Success(fn(v))
     case Failure(e) => Failure(e)
   }
-  def flatMap [X](fn: T => ParseResult[X]): ParseResult[X] = this match {
-    case Success(v) => fn(v)
-    case Failure(e) => Failure(e)
+  def flatMap [X](fn: T => ParseResult[X]): ParseResult[X] = fold (
+    e => Failure(e),
+    v => fn(v)
+  )
+  def fold [X](lf: String => X, rf: T => X) = this match {
+    case Failure(e) => lf(e)
+    case Success(v) => rf(v)
   }
+  def get = fold (
+    e => error(e),
+    v => v
+  )
 }
 private [scoop] case class Success [T] (v: T) extends ParseResult[T]
 private [scoop] case class Failure (error: String) extends ParseResult[Nothing]
@@ -44,7 +55,7 @@ trait SqlType [T] {self =>
   def tpe: Int // jdbc sql type
   def set (stmt: PreparedStatement, idx: Int, value: T): Unit
   def parse (rs: ResultSet, name: String): Option[T]
-  def apply (n: String, sql: String = "") = new ExprParser (n, this)
+  def apply (n: String, sql: String = "") = new ExprParser (n, this, sql)
 }
   
 abstract class SqlNativeType[T] (val tpe: Int, get: (ResultSet, String) => T, _set: (PreparedStatement, Int, T) => Unit) extends SqlType [T] {
@@ -59,6 +70,7 @@ abstract class SqlCustomType[T,N] (from: N => T, to: T => N)(implicit nt: SqlNat
 
 sealed trait SqlParam [T] {
   val v: T
+  def apply (stmt: PreparedStatement, idx: Int): Unit
 }
 
 case class SqlSingleParam [T,S] (v: T)(implicit val tp: SqlType[T]) extends SqlParam[T] {
@@ -66,6 +78,7 @@ case class SqlSingleParam [T,S] (v: T)(implicit val tp: SqlType[T]) extends SqlP
 }
 case class SqlSetParam [T](v: Set[T])(implicit tp: SqlType[T]) extends SqlParam[Set[T]] {
   def toList = v.toList.map(x => SqlSingleParam(x))
+  def apply (stmt: PreparedStatement, idx: Int) = error("WTF!")
 }
 
 trait ResultSetParser[T] extends (ResultSet => ParseResult[T]) {self =>
@@ -81,33 +94,18 @@ trait ResultSetParser[T] extends (ResultSet => ParseResult[T]) {self =>
   def columns: List[query.ExprS]
 }
 
-/*
-class ScoopParser [T] (
-  parseFn: ResultSet => Option[T],
-  name: String,
-  prefix: String
-) extends ResultSetParser[T] {
-  def apply (rs: ResultSet) = parseFn(rs)
-  def prefix (pf: String) = new ScoopParser[T](parseFn, name, pf)
+case class literal [T] (value: T) extends ResultSetParser [T] {
+  def columns = Nil
+  def apply (rs: ResultSet) = Success(value)
 }
-*/
 
-/*
-case class ParserWrapper [T,X] (p: Parser[T], fn: Option[T] => Option[X]) extends Parser[X] {
-  def name = "ParserWrapper(" + p.name + ")"
-  def columns = p.columns
-  def as (prefix: String = null) = ParserWrapper(p.as(prefix), fn)
-  def parse (rs: ResultSet) = fn(p(rs))
-}
-*/
-
-class ExprParser [T] (name: String, exp: SqlType[T]) 
+class ExprParser [T] (name: String, exp: SqlType[T], sql: String = "") 
     extends boilerplate.ParserBase[T] (exp.parse(_, name) map {Success(_)} getOrElse Failure("Could not parse expression: " + name)) {
   def prefix (pf: String) = new ExprParser (pf+name, exp)
-  def columns = List(name)
+  def columns = List(sql) filter (_!="") map (x => x+" as "+name: query.ExprS)
 }
 
-class ColumnParser[T](column: ast.SqlCol[T]) 
+class ColumnParser[T](column: ast.SqlNonNullableCol[T]) 
     extends boilerplate.ParserBase[T] (rs => column parse rs map {Success(_)} getOrElse Failure("Could not parse column: " + column.name)) {
   def name = column.name
   def columns = List(column.selectSql)
@@ -116,7 +114,7 @@ class ColumnParser[T](column: ast.SqlCol[T])
 class NullableColumnParser[T](column: ast.SqlNullableCol[T]) 
     extends boilerplate.ParserBase[Option[T]] (rs => column parse rs map {Success(_)} getOrElse Failure("Could not parse column: " + column.name)) {
   def name = column.name
-  def columns = List(column.sql)
+  def columns = List(column.selectSql)
 }
 
 abstract class SqlOrder (val sql: String)
@@ -131,3 +129,4 @@ case class ColumnWrapper [X](col: ast.SqlCol[X]) {
   def desc  = SqlOrdering(col, Descending)
   def asc   = SqlOrdering(col, Ascending)
 }
+

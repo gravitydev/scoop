@@ -1,7 +1,7 @@
 package com.gravitydev.scoop
 package boilerplate
 
-import collection._
+import com.gravitydev.scoop.collection._
 import java.sql.ResultSet
 
 object `package` {
@@ -12,8 +12,8 @@ object `package` {
   def tuple [A,B,C,D](a:A,b:B,c:C,d:D) = (a,b,c,d)
   def tuple [A,B,C,D,E](a:A,b:B,c:C,d:D,e:E) = (a,b,c,d,e)
   */
-  
-  def hlist2 [A,B] (a:A,b:B) = a :: b :: HNil
+
+  def hlist2 [A,B] (a:A,b:B) = a :: b :: HNil 
   def hlist3 [A,B,C] (a:A,b:B,c:C) = a :: b :: c :: HNil
   def hlist4 [A,B,C,D](a:A,b:B,c:C,d:D) = a :: b :: c :: d :: HNil
   def hlist5 [A,B,C,D,E](a:A,b:B,c:C,d:D,e:E) = a :: b :: c :: d :: e :: HNil
@@ -72,7 +72,7 @@ class Parser1 [A](pa: P[A]) extends ParserX[A] {
   def apply (rs: ResultSet) = pa(rs)
 }
 
-class Parser2 [A,B](pa: P[A], pb: P[B]) extends ParserX[A:+:B:+:HNil] {
+class Parser2 [A,B](pa: P[A], pb: P[B]) extends ParserX[A :+: B :+: HNil] {
   def list = List(pa,pb)
   def >> [T](fn: (A,B)=>T) = new CompoundParser(this, for (a <- pa; b <- pb) yield fn(a,b))
   def ~ [X](px: P[X]) = new Parser3(pa,pb,px)
@@ -136,70 +136,70 @@ class Parser10 [A,B,C,D,E,F,G,H,I,J](pa: P[A], pb: P[B], pc: P[C], pd: P[D], pe:
 }
 
 class Parser11 [A,B,C,D,E,F,G,H,I,J,K](pa: P[A], pb: P[B], pc: P[C], pd: P[D], pe: P[E], pf: P[F], pg: P[G], ph: P[H], pi: P[I], pj: P[J], pk: P[K]) extends ParserX[A:+:B:+:C:+:D:+:E:+:F:+:G:+:H:+:I:+:J:+:K:+:HNil]{
-  def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj)
+  def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk)
   def >> [T](fn: (A,B,C,D,E,F,G,H,I,J,K)=>T) = new CompoundParser(this, for (a <- pa; b <- pb; c <- pc; d <- pd; e <- pe; f <- pf; g <- pg; h <- ph; i <- pi; j <- pj; k <- pk) yield fn(a,b,c,d,e,f,g,h,i,j,k))
   def ~ [X](px: P[X]) = new Parser12(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,px)
   def apply (rs: ResultSet) = >>(hlist11)(rs)
 }
 
 class Parser12 [A,B,C,D,E,F,G,H,I,J,K,L](pa: P[A], pb: P[B], pc: P[C], pd: P[D], pe: P[E], pf: P[F], pg: P[G], ph: P[H], pi: P[I], pj: P[J], pk: P[K], pl: P[L]) extends ParserX[A:+:B:+:C:+:D:+:E:+:F:+:G:+:H:+:I:+:J:+:K:+:L:+:HNil]{
-  def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pl)
+  def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl)
   def >> [T](fn: (A,B,C,D,E,F,G,H,I,J,K,L)=>T) = new CompoundParser(this, for (a <- pa; b <- pb; c <- pc; d <- pd; e <- pe; f <- pf; g <- pg; h <- ph; i <- pi; j <- pj; k <- pk; l <- pl) yield fn(a,b,c,d,e,f,g,h,i,j,k,l))
   def ~ [X](px: P[X]) = new Parser13(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,px)
   def apply (rs: ResultSet) = >>(hlist12)(rs)
 }
 
 class Parser13 [A,B,C,D,E,F,G,H,I,J,K,L,M](pa: P[A], pb: P[B], pc: P[C], pd: P[D], pe: P[E], pf: P[F], pg: P[G], ph: P[H], pi: P[I], pj: P[J], pk: P[K], pl: P[L], pm: P[M]) extends ParserX[A:+:B:+:C:+:D:+:E:+:F:+:G:+:H:+:I:+:J:+:K:+:L:+:M:+:HNil]{
-  def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pl,pm)
+  def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm)
   def >> [T](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M)=>T) = new CompoundParser(this, for (a <- pa; b <- pb; c <- pc; d <- pd; e <- pe; f <- pf; g <- pg; h <- ph; i <- pi; j <- pj; k <- pk; l <- pl; m <- pm) yield fn(a,b,c,d,e,f,g,h,i,j,k,l,m))
   def ~ [X](px: P[X]) = new Parser14(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,px)
   def apply (rs: ResultSet) = >>(hlist13)(rs)
 }
 
 class Parser14 [A,B,C,D,E,F,G,H,I,J,K,L,M,N](pa: P[A], pb: P[B], pc: P[C], pd: P[D], pe: P[E], pf: P[F], pg: P[G], ph: P[H], pi: P[I], pj: P[J], pk: P[K], pl: P[L], pm: P[M], pn: P[N]) extends ParserX[A:+:B:+:C:+:D:+:E:+:F:+:G:+:H:+:I:+:J:+:K:+:L:+:M:+:N:+:HNil]{
-  def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pl,pm,pn)
+  def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn)
   def >> [T](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N)=>T) = new CompoundParser(this, for (a <- pa; b <- pb; c <- pc; d <- pd; e <- pe; f <- pf; g <- pg; h <- ph; i <- pi; j <- pj; k <- pk; l <- pl; m <- pm; n <- pn) yield fn(a,b,c,d,e,f,g,h,i,j,k,l,m,n))
   def ~ [X](px: P[X]) = new Parser15(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,px)
   def apply (rs: ResultSet) = >>(hlist14)(rs)
 }
 
 class Parser15 [A,B,C,D,E,F,G,H,I,J,K,L,M,N,O](pa: P[A], pb: P[B], pc: P[C], pd: P[D], pe: P[E], pf: P[F], pg: P[G], ph: P[H], pi: P[I], pj: P[J], pk: P[K], pl: P[L], pm: P[M], pn: P[N], po: P[O]) extends ParserX[A:+:B:+:C:+:D:+:E:+:F:+:G:+:H:+:I:+:J:+:K:+:L:+:M:+:N:+:O:+:HNil]{
-  def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pl,pm,pn,po)
+  def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po)
   def >> [T](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O)=>T) = new CompoundParser(this, for (a <- pa; b <- pb; c <- pc; d <- pd; e <- pe; f <- pf; g <- pg; h <- ph; i <- pi; j <- pj; k <- pk; l <- pl; m <- pm; n <- pn; o <- po) yield fn(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o))
   def ~ [X](px: P[X]) = new Parser16(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,px)
   def apply (rs: ResultSet) = >>(hlist15)(rs)
 }
 
 class Parser16 [A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q](pa: P[A], pb: P[B], pc: P[C], pd: P[D], pe: P[E], pf: P[F], pg: P[G], ph: P[H], pi: P[I], pj: P[J], pk: P[K], pl: P[L], pm: P[M], pn: P[N], po: P[O], pq: P[Q]) extends ParserX[A:+:B:+:C:+:D:+:E:+:F:+:G:+:H:+:I:+:J:+:K:+:L:+:M:+:N:+:O:+:Q:+:HNil]{
-  def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pl,pm,pn,po,pq)
+  def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pq)
   def >> [T](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q)=>T) = new CompoundParser(this, for (a <- pa; b <- pb; c <- pc; d <- pd; e <- pe; f <- pf; g <- pg; h <- ph; i <- pi; j <- pj; k <- pk; l <- pl; m <- pm; n <- pn; o <- po; q <- pq) yield fn(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,q))
   def ~ [X](px: P[X]) = new Parser17(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pq,px)
   def apply (rs: ResultSet) = >>(hlist16)(rs)
 }
 
 class Parser17 [A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q,R](pa:P[A], pb:P[B], pc:P[C], pd:P[D], pe:P[E], pf:P[F], pg:P[G], ph:P[H], pi:P[I], pj:P[J], pk:P[K], pl:P[L], pm:P[M], pn:P[N], po:P[O], pq:P[Q], pr:P[R]) extends ParserX[A:+:B:+:C:+:D:+:E:+:F:+:G:+:H:+:I:+:J:+:K:+:L:+:M:+:N:+:O:+:Q:+:R:+:HNil]{
-  def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pl,pm,pn,po,pq,pr)
+  def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pq,pr)
   def >> [T](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q,R)=>T) = new CompoundParser(this, for (a<-pa; b<-pb; c<-pc; d<-pd; e<-pe; f<-pf; g<-pg; h<-ph; i<-pi; j<-pj; k<-pk; l<-pl; m<-pm; n<-pn; o<-po; q<-pq; r<-pr) yield fn(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,q,r))
   def ~ [X](px: P[X]) = new Parser18(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pq,pr,px)
   def apply (rs: ResultSet) = >>(hlist17)(rs)
 }
 
 class Parser18 [A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q,R,S](pa:P[A], pb:P[B], pc:P[C], pd:P[D], pe:P[E], pf:P[F], pg:P[G], ph:P[H], pi:P[I], pj:P[J], pk:P[K], pl:P[L], pm:P[M], pn:P[N], po:P[O], pq:P[Q], pr:P[R], ps:P[S]) extends ParserX[A:+:B:+:C:+:D:+:E:+:F:+:G:+:H:+:I:+:J:+:K:+:L:+:M:+:N:+:O:+:Q:+:R:+:S:+:HNil]{
-  def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pl,pm,pn,po,pq,pr,ps)
+  def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pq,pr,ps)
   def >> [Z](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q,R,S)=>Z) = new CompoundParser(this, for (a<-pa; b<-pb; c<-pc; d<-pd; e<-pe; f<-pf; g<-pg; h<-ph; i<-pi; j<-pj; k<-pk; l<-pl; m<-pm; n<-pn; o<-po; q<-pq; r<-pr; s<-ps) yield fn(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,q,r,s))
   def ~ [X](px: P[X]) = new Parser19(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pq,pr,ps,px)
   def apply (rs: ResultSet) = >>(hlist18)(rs)
 }
 
 class Parser19 [A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q,R,S,T](pa:P[A], pb:P[B], pc:P[C], pd:P[D], pe:P[E], pf:P[F], pg:P[G], ph:P[H], pi:P[I], pj:P[J], pk:P[K], pl:P[L], pm:P[M], pn:P[N], po:P[O], pq:P[Q], pr:P[R], ps:P[S], pt:P[T]) extends ParserX[A:+:B:+:C:+:D:+:E:+:F:+:G:+:H:+:I:+:J:+:K:+:L:+:M:+:N:+:O:+:Q:+:R:+:S:+:T:+:HNil]{
-  def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pl,pm,pn,po,pq,pr,ps,pt)
+  def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pq,pr,ps,pt)
   def >> [Z](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q,R,S,T)=>Z) = new CompoundParser(this, for (a<-pa; b<-pb; c<-pc; d<-pd; e<-pe; f<-pf; g<-pg; h<-ph; i<-pi; j<-pj; k<-pk; l<-pl; m<-pm; n<-pn; o<-po; q<-pq; r<-pr; s<-ps; t<-pt) yield fn(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,q,r,s,t))
   def ~ [X](px: P[X]) = new Parser20(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pq,pr,ps,pt,px)
   def apply (rs: ResultSet) = >>(hlist19)(rs)
 }
 
 class Parser20 [A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q,R,S,T,U](pa:P[A], pb:P[B], pc:P[C], pd:P[D], pe:P[E], pf:P[F], pg:P[G], ph:P[H], pi:P[I], pj:P[J], pk:P[K], pl:P[L], pm:P[M], pn:P[N], po:P[O], pq:P[Q], pr:P[R], ps:P[S], pt:P[T], pu:P[U]) extends ParserX[A:+:B:+:C:+:D:+:E:+:F:+:G:+:H:+:I:+:J:+:K:+:L:+:M:+:N:+:O:+:Q:+:R:+:S:+:T:+:U:+:HNil]{
-  def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pl,pm,pn,po,pq,pr,ps,pt,pu)
+  def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pq,pr,ps,pt,pu)
   def >> [Z](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q,R,S,T,U)=>Z) = new CompoundParser(this, for (a<-pa; b<-pb; c<-pc; d<-pd; e<-pe; f<-pf; g<-pg; h<-ph; i<-pi; j<-pj; k<-pk; l<-pl; m<-pm; n<-pn; o<-po; q<-pq; r<-pr; s<-ps; t<-pt; u<-pu) yield fn(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,q,r,s,t,u))
   //def ~ [X](px: P[X]) = new Parser20(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,po,pq,pr,ps,pt,px)
   def apply (rs: ResultSet) = >>(hlist20)(rs)

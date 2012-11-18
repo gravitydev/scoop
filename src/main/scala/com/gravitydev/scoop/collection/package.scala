@@ -12,3 +12,4 @@ package object collection {
 
   type Id[A] = A
 }
+

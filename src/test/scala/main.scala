@@ -43,7 +43,14 @@ class ScoopSuite extends FunSuite {
     
     val userP = userParser(u)
     val issueParser = i.id ~ userP >> Issue.apply
-    
+
+    val xparser = i.id ~ userP ~ long("test", sql="(SELECT 1)")
+
+    val testParser = i.id ~ xparser
+
+    val qq = from(i) select(testParser.columns:_*) 
+
+    println(qq)
     
     println("USER COLS")
     println(issueParser.columns.map(_.sql))
@@ -52,6 +59,7 @@ class ScoopSuite extends FunSuite {
     val q = from(i)
       .innerJoin (u on i.reported_by === u.id)
       .where (u.first_name === "alvaro")
+      .addWhere("u.last_name = ?", "carrasco")
       .orderBy (u.first_name desc, u.last_name asc)
       .select (issueParser.columns:_*)
       
@@ -63,6 +71,11 @@ class ScoopSuite extends FunSuite {
     
     println(test)
     //println(res)
+    
+    val x = insertInto(i).set(
+      i.item_id     := 24,
+      i.project_id  := 27
+    )
     
   }
 }
