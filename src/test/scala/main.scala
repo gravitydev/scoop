@@ -1,6 +1,6 @@
 import org.scalatest.FunSuite
 
-import com.gravitydev.scoop._, collection._, strong._, query._
+import com.gravitydev.scoop._, collection._, strong._, query._, util._
 
 class ScoopSuite extends FunSuite {
   import Repo._
@@ -63,13 +63,13 @@ class ScoopSuite extends FunSuite {
       .orderBy (u.first_name desc, u.last_name asc)
       .select (issueParser.columns:_*)
       
-    println(q)
+    //println(q)
       
     val test = q map issueParser
     
     //val res = mapped(con)
     
-    println(test)
+    //println(test)
     //println(res)
     
     val x = insertInto(i).set(
@@ -78,4 +78,22 @@ class ScoopSuite extends FunSuite {
     )
     
   }
+
+  test ("utils") {
+    util.processQuery("SELECT 1 as first, 2 as second, 'something' as ha") {rs =>
+      val md = rs.getMetaData
+
+      val count = md.getColumnCount()
+      def getColumns (remaining: Int = count): List[String] = {
+        val idx = count - remaining + 1
+        if (remaining == 0) Nil
+        else (md.getColumnName(idx)+" ["+md.getColumnTypeName(idx)+"] (" + rs.getObject(idx) + ")") :: getColumns(remaining-1)
+      }
+      
+      val columns = getColumns()  
+
+      println(columns)
+    }
+  }
 }
+

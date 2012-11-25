@@ -17,9 +17,9 @@ object `package` {
   implicit def toPredicate (s: String)    = new PredicateS(s, Nil)
   implicit def toOrder (s: String)        = new OrderByS(s)
   
-  implicit def colToExprS (col: SqlCol[_])  = new ExprS(col.selectSql)
-  implicit def tableToFrom (t: SqlTable[_]) = new FromS(t.sql)
-  implicit def joinToJoin (j: Join)         = new JoinS(j.sql, j.params)
+  implicit def colToExprS (col: SqlCol[_])      = new ExprS(col.selectSql)
+  implicit def tableToFrom (t: SqlTable[_])     = new FromS(t.sql)
+  implicit def joinToJoin (j: Join)             = new JoinS(j.sql, j.params)
   implicit def predToPredicateS (pred: SqlExpr[Boolean]) = new PredicateS(pred.sql, pred.params)
   implicit def orderingToOrder (o: SqlOrdering) = new OrderByS(o.sql)
   implicit def assignmentToAssignmentS (a: SqlAssignment[_]) = new AssignmentS(a.sql, a.params)
@@ -29,6 +29,7 @@ object `package` {
   // starting point
   def from (table: FromS) = Query(table.sql)
   def insertInto (table: SqlTable[_]) = new InsertBuilder(table.tableName)
+  def update (table: FromS) = new UpdateBuilder(table)
 }
 
 class TableWrapper [T <: SqlTable[_]](t: T) {
@@ -45,26 +46,37 @@ sealed abstract class SqlS (val sql: String) {
 class ExprS      (s: String) extends SqlS(s)
 class FromS      (s: String) extends SqlS(s)
 class JoinS      (s: String, val params: Seq[SqlParam[_]]) extends SqlS(s)
-class PredicateS (s: String, val params: Seq[SqlParam[_]]) extends SqlS(s)
+
+class PredicateS (s: String, val params: Seq[SqlParam[_]]) extends SqlS(s) {
+  def onParams (p: SqlParam[_]*): PredicateS = new PredicateS(s, params ++ p.toSeq)
+}
+
 class OrderByS   (s: String) extends SqlS(s)
 class AssignmentS (s: String, val params: Seq[SqlParam[_]]) extends SqlS(s)
 
 class InsertBuilder (into: String) {
-  def set (assignments: AssignmentS*) = Insert (into, assignments.map(_.sql).toList)
+  def set (assignments: AssignmentS*) = Insert (into, assignments.map(_.sql).toList, assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params})
+}
+
+class UpdateBuilder (tb: FromS) {
+  def set (assignments: AssignmentS*) = Update (tb.sql, assignments.map(_.sql).toList, None, assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params})
 }
 
 case class Insert (
   into: String,
-  assignments: List[String] = Nil
+  assignments: List[String] = Nil,
+  params: Seq[SqlParam[_]] = Nil
 ) {
   def sql = "INSERT INTO " + into + " SET " + assignments.mkString(", ")
   def apply ()(implicit c: Connection) = {
-    util.using(c.prepareStatement(sql)) {stmt => 
+    import java.sql.Statement
+    util.using(c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {stmt => 
       stmt.executeUpdate()
-    }
-    
-    util.using(c.prepareStatement("SELECT LAST_INSERT_ID()")) {stmt => 
-      util.using(stmt.executeQuery()) (_ getLong 1)
+
+      util.using(stmt.getGeneratedKeys()) {rs =>
+        rs.next()
+        rs.getLong(1)
+      }
     }
   }
 }
@@ -72,8 +84,18 @@ case class Insert (
 case class Update (
   table: String,
   assignments: List[String] = Nil,
-  predicate: Option[String] = None
-)
+  predicate: Option[String] = None,
+  params: Seq[SqlParam[_]]  = Nil
+) {
+  def where (pred: PredicateS) = copy(predicate = predicate.map(_ + " AND " + pred.sql).orElse(Some(pred.sql)), params = this.params ++ pred.params)
+  def sql = "UPDATE " + table + " SET " + assignments.mkString(", ") + predicate.map(w => " \nWHERE " + w + "\n").getOrElse("")
+  def apply ()(implicit c: Connection) = {
+    util.using(c.prepareStatement(sql)) {stmt => 
+      for ((p, idx) <- params.zipWithIndex) p(stmt, idx+1)
+      stmt.executeUpdate()
+    }
+  }
+}
 
 case class Query (
   from:       String,
@@ -90,10 +112,16 @@ case class Query (
   def addCols (cols: ExprS*)  = copy(sel = sel ++ cols.map(_.sql).toList)
   def innerJoin (join: JoinS) = copy(joins = joins ++ List("INNER JOIN " + join.sql), params = this.params ++ join.params )
   def leftJoin (join: JoinS)  = copy(joins = joins ++ List("LEFT JOIN " + join.sql), params = this.params ++ join.params)
-  
-  def where (predicate: PredicateS, params: SqlSingleParam[_,_]*) = copy(predicate = Some(predicate.sql)/*, params = this.params ++ predicate.params ++ params.toList*/)
-  def where (predicate: SqlExpr[Boolean]) = copy(predicate = Some(predicate.sql), params = this.params ++ predicate.params)
-  def addWhere (pred: PredicateS, params: SqlSingleParam[_,_]*) = copy(predicate = predicate.map(_ + " AND " + pred.sql).orElse(Some(pred.sql)), params = this.params ++ params.toSeq)
+
+  // not sure if these should exist (where methods that overwrite the previous where clause)  
+  //def where (predicate: PredicateS) = copy(predicate = Some(predicate.sql), params = this.params ++ predicate.params)
+
+  // i don't think this is necessary anymore
+  //def where (predicate: SqlExpr[Boolean]) = copy(predicate = Some(predicate.sql), params = this.params ++ predicate.params)
+
+  // always append? we'll go with that for now
+  def where (pred: PredicateS) = copy(predicate = predicate.map(_ + " AND " + pred.sql).orElse(Some(pred.sql)), params = this.params ++ pred.params)
+
   def orderBy (order: OrderByS*) = copy(order = Some( (order.toList.map(_.sql)).mkString(", ")) )
   def groupBy (cols: ExprS*) = copy(group = cols.map(_.sql).toList)
   def limit (l: Int): Query = copy(limit = Some(l))
@@ -108,8 +136,8 @@ case class Query (
     order.map("ORDER BY " + _ + "\n").getOrElse("") +
     limit.map("LIMIT " + _ + "\n").getOrElse("") +
     offset.map("OFFSET " + _ + "\n").getOrElse("")
-  
-  def map [B](process: ResultSet => ParseResult[B])(implicit c: Connection): List[B] =
+ 
+  def map [B](process: ResultSet => ParseResult[B])(implicit c: Connection): List[B] = try {
     util.using (c.prepareStatement(sql)) {statement =>
       for ((p, idx) <- params.zipWithIndex) p(statement, idx+1)
       
@@ -122,6 +150,9 @@ case class Query (
         }
       }
     }
+  } catch {
+    case e: java.sql.SQLException => throw new Exception("SQL Exception ["+e.getMessage+"] when executing query ["+sql+"] with parameterss: ["+params+"]")
+  }
   
   override def toString = {
     "Query(sql="+sql+", params=" + renderParams(params) +")"

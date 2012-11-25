@@ -11,6 +11,7 @@ object ScoopBuild extends Build {
     crossScalaVersions := Seq("2.8.1", "2.9.1"),
     publishTo := Some(gravityRepo),
     libraryDependencies ++= Seq(
+      "org.slf4j"     % "slf4j-api"               % "1.6.4",
       "org.scalatest" %%  "scalatest"             % "1.8"     % "test",
       "mysql"         %   "mysql-connector-java"  % "5.1.18"  % "test"
     )	  

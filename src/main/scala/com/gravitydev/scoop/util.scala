@@ -2,9 +2,22 @@ package com.gravitydev.scoop.util
 
 import scala.collection.mutable.ListBuffer
 import java.sql.{Connection, ResultSet}
+import org.slf4j.{Logger, LoggerFactory}
 
 object `package` {
   private type Closeable = {def close(): Unit}
+  
+  // alias logging
+  class ScoopLogger (underlying: Logger) {
+    def debug (msg: => String) = underlying.debug(msg)
+    def info (msg: => String) = underlying.info(msg)
+    def warn (msg: => String) = underlying.warn(msg)
+    def error (msg: => String) = underlying.error(msg)
+  }
+
+  trait Logging {
+    lazy val logger = new ScoopLogger(LoggerFactory getLogger getClass)
+  }
     
   def bmap[T](test: => Boolean)(block: => T): List[T] = {
     val ret = new ListBuffer[T]
@@ -26,4 +39,18 @@ object `package` {
       }
     }
   }
+
+  def inspectRS (rs: ResultSet) = {
+    val md = rs.getMetaData
+    val count = md.getColumnCount()
+
+    def getColumns (remaining: Int): List[String] = {
+      val idx = count - remaining + 1
+      if (remaining == 0) Nil
+      else (md.getColumnLabel(idx)+" ["+md.getColumnTypeName(idx)+"] (" + rs.getObject(idx) + ")") :: getColumns(remaining-1)
+    }
+    
+    getColumns(count) mkString("ResultSet:\n", "\n", "\n")
+  }
 }
+

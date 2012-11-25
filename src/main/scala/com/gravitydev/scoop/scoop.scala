@@ -1,6 +1,7 @@
 package com.gravitydev.scoop
 
 import java.sql.{ResultSet, PreparedStatement, Types, Timestamp, Date}
+import util.Logging
 
 object `package` {
   type Table[T <: ast.SqlTable[T]] = ast.SqlTable[T]
@@ -58,9 +59,12 @@ trait SqlType [T] {self =>
   def apply (n: String, sql: String = "") = new ExprParser (n, this, sql)
 }
   
-abstract class SqlNativeType[T] (val tpe: Int, get: (ResultSet, String) => T, _set: (PreparedStatement, Int, T) => Unit) extends SqlType [T] {
-  def set (stmt: PreparedStatement, idx: Int, value: T): Unit = _set(stmt, idx, value)
-  def parse (rs: ResultSet, name: String) = Option(get(rs, name)) filter {_ => !rs.wasNull} 
+abstract class SqlNativeType[T] (val tpe: Int, get: (ResultSet, String) => T, _set: (PreparedStatement, Int, T) => Unit) extends SqlType [T] with Logging {
+  def set (stmt: PreparedStatement, idx: Int, value: T): Unit = {
+    if (value==null) stmt.setNull(idx, tpe)
+    else _set(stmt, idx, value)
+  }
+  def parse (rs: ResultSet, name: String) = Option(get(rs, name)) filter {_ => !rs.wasNull}
 }
 abstract class SqlCustomType[T,N] (from: N => T, to: T => N)(implicit nt: SqlNativeType[N]) extends SqlType[T] {
   def tpe = nt.tpe
@@ -106,13 +110,21 @@ class ExprParser [T] (name: String, exp: SqlType[T], sql: String = "")
 }
 
 class ColumnParser[T](column: ast.SqlNonNullableCol[T]) 
-    extends boilerplate.ParserBase[T] (rs => column parse rs map {Success(_)} getOrElse Failure("Could not parse column: " + column.name)) {
+    extends boilerplate.ParserBase[T] (rs => 
+      column parse rs map {Success(_)} getOrElse {
+        Failure("Could not parse column [" + column.name + "] from " + util.inspectRS(rs))
+      }
+    ) {
   def name = column.name
   def columns = List(column.selectSql)
 }
 
 class NullableColumnParser[T](column: ast.SqlNullableCol[T]) 
-    extends boilerplate.ParserBase[Option[T]] (rs => column parse rs map {Success(_)} getOrElse Failure("Could not parse column: " + column.name)) {
+    extends boilerplate.ParserBase[Option[T]] (rs => 
+      column parse rs map {Success(_)} getOrElse {
+        Failure("Could not parse [" + column.name + "] (optional) from " + util.inspectRS(rs)) 
+      }
+    ) {
   def name = column.name
   def columns = List(column.selectSql)
 }
