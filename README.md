@@ -29,25 +29,8 @@ class Users (as: String) extends Table[Users]("users", Users) {
 def users = Users("u") // useful for creating default alias
 ```
 
-Strong API
-----------
-
-*Not quite ready yet* The strong API is mostly modeled after squeryl (though nowhere near as featured at the moment).
-It tries to provide the strongest guarantees that if your code compiles, the generated SQL is free of syntax (and some semantic) errors. 
-Since you don't define the data model using classes representing rows, you have to do your own mapping though. In that sense, it is closer to ScalaQuery than Squeryl.
-The syntax is also just a bit closer to SQL since you can use symbols like >, <=, etc even with primitives.
-
-```scala
-import com.gravitydev.scoop._, strong._
-
-val query = from(users)(u => 
-  where(u.age > 24 and u.name === "alvaro")
-  select(u.first_name, u.last_name)
-)
-```
-
-Query API (stringly typed)
---------------------------
+Query API 
+---------
 
 *Somewhat usable* This API sacrifices some safety for flexibility and in some cases readability. It looks a bit more like SQL and you can 
 actually combine the model objects with custom query strings.

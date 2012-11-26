@@ -1,6 +1,6 @@
 import org.scalatest.FunSuite
 
-import com.gravitydev.scoop._, collection._, strong._, query._, util._
+import com.gravitydev.scoop._, query._
 
 class ScoopSuite extends FunSuite {
   import Repo._
@@ -8,37 +8,23 @@ class ScoopSuite extends FunSuite {
   Class forName "com.mysql.jdbc.Driver"
   implicit val con = java.sql.DriverManager.getConnection("jdbc:mysql://localhost/gravitydev", "root", "")
   
-  test ("strong API") {
-    import strong._;
-    /*
-    val q = from (users, users)((r, a) =>
-      select(r.first_name, a.last_name, a.id)
-    ) map {case x :+: y :+: age :+: HNil =>
-      println(x)
-    }*/
-    
-    /*
-    val q = from(users)(u => 
-      select(u.first_name, u.last_name, u.id)
-    )
-    
-    case class User(first: String, last: String, age: Long)
-    
-    val mapped = q map {case f :+: l :+: i :+: HNil =>
-      User(f,l,i)
-    }
-    */
-  }
-  
   test ("query API") {
-    import query._
-
     case class User (first: String, last: String)
     case class Issue (id: Long, assignee: User)
     
-    def userParser (u: Users) = u.first_name ~ u.last_name >> User.apply
+    def userParser (u: users) = u.first_name ~ u.last_name >> User.apply
     
-    val u = users as "u" prefix "reporter_"
+    val res = using (users as "hello") {u =>
+      println(u)
+      println(u.first_name)
+      val q = from(u)
+        .where(u.email === "")
+        .select(u.first_name)
+      println(q)
+      ""
+    }
+    
+    val u = users as "reporter"
     val i = issues as "i"
     
     val userP = userParser(u)
@@ -59,7 +45,7 @@ class ScoopSuite extends FunSuite {
     val q = from(i)
       .innerJoin (u on i.reported_by === u.id)
       .where (u.first_name === "alvaro")
-      .addWhere("u.last_name = ?", "carrasco")
+      .where("reporter.last_name = ?" onParams "carrasco")
       .orderBy (u.first_name desc, u.last_name asc)
       .select (issueParser.columns:_*)
       
@@ -77,22 +63,14 @@ class ScoopSuite extends FunSuite {
       i.project_id  := 27
     )
     
+    println(x.sql)
+    println(x.params)
+    
   }
 
   test ("utils") {
     util.processQuery("SELECT 1 as first, 2 as second, 'something' as ha") {rs =>
-      val md = rs.getMetaData
-
-      val count = md.getColumnCount()
-      def getColumns (remaining: Int = count): List[String] = {
-        val idx = count - remaining + 1
-        if (remaining == 0) Nil
-        else (md.getColumnName(idx)+" ["+md.getColumnTypeName(idx)+"] (" + rs.getObject(idx) + ")") :: getColumns(remaining-1)
-      }
-      
-      val columns = getColumns()  
-
-      println(columns)
+      println(util.inspectRS(rs))
     }
   }
 }

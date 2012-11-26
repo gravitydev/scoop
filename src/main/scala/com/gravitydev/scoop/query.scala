@@ -25,11 +25,41 @@ object `package` {
   implicit def assignmentToAssignmentS (a: SqlAssignment[_]) = new AssignmentS(a.sql, a.params)
   
   implicit def listToExpr (l: List[String]) = l.map(x => x: ExprS)
+  implicit def companionToTable [T <: ast.SqlTable[T]] (companion: {def apply (): T}): T = companion()
 
   // starting point
   def from (table: FromS) = Query(table.sql)
-  def insertInto (table: SqlTable[_]) = new InsertBuilder(table.tableName)
+  def insertInto (table: SqlTable[_]) = new InsertBuilder(table._tableName)
   def update (table: FromS) = new UpdateBuilder(table)
+
+  // safe aliasing
+  private class Aliaser {
+    import scala.collection.mutable.ListBuffer
+    val aliases = ListBuffer[String]()
+        
+    def getAlias (name: String, suffix: Int = 0): String = {
+      val alias = name + (if (suffix == 0) "" else suffix.toString)
+      if (aliases.contains(alias)) getAlias(name, suffix+1) else {
+        aliases += alias
+        alias
+      }
+    }
+    
+    def apply [A <: Table[A]] (a: TableCompanion[A]) = a as getAlias(a._alias)
+  }
+    
+  private [this] def aliasing [T](fn: Aliaser => T) = fn(new Aliaser)
+  
+  private type TC[A <: Table[A]] = TableCompanion[A]
+  
+  def using [R, A <: Table[A]](a: TC[A])(fn: A => R) = aliasing(x => fn(x(a)))
+  def using [R, A <: Table[A], B <: Table[B]](a: TC[A], b: TC[B])(fn: (A,B)=>R) = aliasing(x => fn(x(a), x(b)))
+  def using [R, A <: Table[A], B <: Table[B], C <: Table[C]](a: TC[A], b: TC[B], c: TC[C])(fn: (A,B,C)=>R) = aliasing(x => fn(x(a), x(b), x(c)))
+  def using [R, A <: Table[A], B <: Table[B], C <: Table[C], D <: Table[D]](a: TC[A], b: TC[B], c: TC[C], d: TC[D])(fn: (A,B,C,D)=>R) = aliasing(x => fn(x(a), x(b), x(c), x(d)))
+  def using [R, A <: Table[A], B <: Table[B], C <: Table[C], D <: Table[D], E <: Table[E]](a: TC[A], b: TC[B], c: TC[C], d: TC[D], e: TC[E])(fn: (A,B,C,D,E)=>R) = aliasing(x => fn(x(a), x(b), x(c), x(d), x(e)))
+  def using [R, A <: Table[A], B <: Table[B], C <: Table[C], D <: Table[D], E <: Table[E], F <: Table[F]](a: TC[A], b: TC[B], c: TC[C], d: TC[D], e: TC[E], f: TC[F])(fn: (A,B,C,D,E,F)=>R) = aliasing(x => fn(x(a), x(b), x(c), x(d), x(e), x(f)))
+  def using [R, A <: Table[A], B <: Table[B], C <: Table[C], D <: Table[D], E <: Table[E], F <: Table[F], G <: Table[G]](a: TC[A], b: TC[B], c: TC[C], d: TC[D], e: TC[E], f: TC[F], g: TC[G])(fn: (A,B,C,D,E,F,G)=>R) = aliasing(x => fn(x(a), x(b), x(c), x(d), x(e), x(f), x(g)))
+  def using [R, A <: Table[A], B <: Table[B], C <: Table[C], D <: Table[D], E <: Table[E], F <: Table[F], G <: Table[G], H <: Table[H]](a: TC[A], b: TC[B], c: TC[C], d: TC[D], e: TC[E], f: TC[F], g: TC[G], h: TC[H])(fn: (A,B,C,D,E,F,G,H)=>R) = aliasing(x => fn(x(a), x(b), x(c), x(d), x(e), x(f), x(g), x(h)))
 }
 
 class TableWrapper [T <: SqlTable[_]](t: T) {
@@ -128,7 +158,7 @@ case class Query (
   def offset (o: Int): Query = copy(offset = Some(o))
   
   def sql = 
-    "SELECT " + sel.mkString(", ") + "\n" + 
+    "SELECT " + sel.mkString(", \n") + " \n" + 
     "FROM " + from + "\n" +
     joins.mkString("", "\n", "\n") + 
     predicate.map(w => "WHERE " + w + "\n").getOrElse("") + 

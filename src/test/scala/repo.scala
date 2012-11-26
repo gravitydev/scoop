@@ -4,7 +4,7 @@ object Repo {
   
   implicit object SqlIssueStatus extends SqlCustomType [IssueStatus, Int] (IssueStatus.apply _, _.id)
   
-  case class Issues (as: String, pf: String) extends Table[Issues]("issues", Issues) {
+  case class issues () extends Table[issues](issues) {
     val id          = col[Long]         ("id")
     val project_id  = col[Long]         ("project_id")
     val item_id     = col[Long]         ("item_id")
@@ -17,23 +17,13 @@ object Repo {
     
     val * = id ~ project_id
   }
-  def issues = Issues("i", "")
   
-  case class Users (as: String, pf: String) extends Table[Users]("users", Users) {
+  case class users () extends Table[users](users) {
     val id          = col[Long]         ("id")
     def first_name  = col[String]       ("first_name")
     def last_name   = col[String]       ("last_name")
     def email       = col[String]       ("email")
   }
-  def users = Users("u", "")
-  
-  
-  
-  
-  
-  
-  
-  
   
   case class IssueStatus(id: Int)
   
@@ -49,26 +39,10 @@ object Repo {
     assignee: Option[User]
   )
   
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
   object Parsers {
-    def user (u: Users) = u.id ~ u.first_name ~ u.last_name >> {(i,f,l) => User(i,f+" "+l)}
+    def user (u: users) = u.id ~ u.first_name ~ u.last_name >> {(i,f,l) => User(i,f+" "+l)}
     
-    val rep = user(users)
+    //val rep = user(users)
     
     //def issue (i: Issues, r: Users, a: Users) = i.id ~ i.status ~ user(r).as(prefix="reporter_") ~ opt(user(a).as(prefix="assignee_")) map {(i,s,rep,assignee) => Issue(i,s,rep,assignee)}
   }

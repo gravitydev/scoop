@@ -5,7 +5,7 @@ import util.Logging
 
 object `package` {
   type Table[T <: ast.SqlTable[T]] = ast.SqlTable[T]
-  type TableCompanion[T <: Table[T]] = {def apply(s: String, pf: String): T}
+  type TableCompanion[T <: Table[T]] = {def apply() : T}
 
   def opt [T](p: ResultSetParser[T]): ResultSetParser[Option[T]] = new ResultSetParser [Option[T]] {
     def columns = p.columns
