@@ -95,7 +95,7 @@ trait ResultSetParser[T] extends (ResultSet => ParseResult[T]) {self =>
     def columns = self.columns 
   }
   
-  def columns: List[query.ExprS]
+  def columns: List[query.SelectExprS]
 }
 
 case class literal [T] (value: T) extends ResultSetParser [T] {
@@ -106,7 +106,7 @@ case class literal [T] (value: T) extends ResultSetParser [T] {
 class ExprParser [T] (name: String, exp: SqlType[T], sql: String = "") 
     extends boilerplate.ParserBase[T] (exp.parse(_, name) map {Success(_)} getOrElse Failure("Could not parse expression: " + name)) {
   def prefix (pf: String) = new ExprParser (pf+name, exp)
-  def columns = List(sql) filter (_!="") map (x => x+" as "+name: query.ExprS)
+  def columns = List(sql) filter (_!="") map (x => x+" as "+name: query.SelectExprS)
 }
 
 class ColumnParser[T](column: ast.SqlNonNullableCol[T]) 

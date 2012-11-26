@@ -49,7 +49,7 @@ class CompoundParser [H, T <: HList](parsers: KCons[H, T, ResultSetParser]) {
 abstract class ParserBase [A] (fn: ResultSet => ParseResult[A]) extends P[A] {
   def ~ [X](px: P[X]) = new Parser2(this, px)
   def apply (rs: ResultSet) = fn(rs)
-  def columns: List[query.ExprS]
+  def columns: List[query.SelectExprS]
   def >> [T](fn: A=>T) = new Parser1(this map fn)
 }
 
@@ -62,7 +62,7 @@ class CompoundParser [A,X](parser: ParserX[X], mapped: P[A]) extends P[A] {
 
 abstract class ParserX [T] extends ResultSetParser [T] {
   def list: List[ResultSetParser[_]]
-  def columns = list.foldLeft(List[query.ExprS]())((l,p) => l ++ p.columns)
+  def columns = list.foldLeft(List[query.SelectExprS]())((l,p) => l ++ p.columns)
 }
 
 class Parser1 [A](pa: P[A]) extends ParserX[A] {
@@ -102,7 +102,7 @@ class Parser5 [A,B,C,D,E](pa: P[A], pb: P[B], pc: P[C], pd: P[D], pe: P[E]) exte
 
 class Parser6 [A,B,C,D,E,F](pa: P[A], pb: P[B], pc: P[C], pd: P[D], pe: P[E], pf: P[F]) extends ParserX[A:+:B:+:C:+:D:+:E:+:F:+:HNil]{
   def list = List(pa,pb,pc,pd,pe,pf)
-  def >> [T](fn: (A,B,C,D,E,F)=>T) = new Parser1(for (a <- pa; b <- pb; c <- pc; d <- pd; e <- pe; f <- pf) yield fn(a,b,c,d,e,f))
+  def >> [T](fn: (A,B,C,D,E,F)=>T) = new CompoundParser(this, for (a <- pa; b <- pb; c <- pc; d <- pd; e <- pe; f <- pf) yield fn(a,b,c,d,e,f))
   def ~ [X](px: P[X]) = new Parser7(pa,pb,pc,pd,pe,pf,px)
   def apply (rs: ResultSet) = >>(hlist6)(rs)
 }

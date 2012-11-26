@@ -13,6 +13,7 @@ object `package` {
 
   implicit def toFrom (s: String)         = new FromS(s)
   implicit def toExpr (s: String)         = new ExprS(s)
+  implicit def toSelectExpr (s: String)   = new SelectExprS(s)
   implicit def toJoin (s: String)         = new JoinS(s, Nil)
   implicit def toPredicate (s: String)    = new PredicateS(s, Nil)
   implicit def toOrder (s: String)        = new OrderByS(s)
