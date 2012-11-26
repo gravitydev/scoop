@@ -17,11 +17,12 @@ object `package` {
   implicit def toPredicate (s: String)    = new PredicateS(s, Nil)
   implicit def toOrder (s: String)        = new OrderByS(s)
   
-  implicit def colToExprS (col: SqlCol[_])      = new ExprS(col.selectSql)
-  implicit def tableToFrom (t: SqlTable[_])     = new FromS(t.sql)
-  implicit def joinToJoin (j: Join)             = new JoinS(j.sql, j.params)
+  implicit def colToExprS (col: SqlCol[_])        = new ExprS(col.sql)
+  implicit def colToSelectExprS (col: SqlCol[_])  = new SelectExprS(col.selectSql)
+  implicit def tableToFrom (t: SqlTable[_])       = new FromS(t.sql)
+  implicit def joinToJoin (j: Join)               = new JoinS(j.sql, j.params)
   implicit def predToPredicateS (pred: SqlExpr[Boolean]) = new PredicateS(pred.sql, pred.params)
-  implicit def orderingToOrder (o: SqlOrdering) = new OrderByS(o.sql)
+  implicit def orderingToOrder (o: SqlOrdering)   = new OrderByS(o.sql)
   implicit def assignmentToAssignmentS (a: SqlAssignment[_]) = new AssignmentS(a.sql, a.params)
   
   implicit def listToExpr (l: List[String]) = l.map(x => x: ExprS)
@@ -73,9 +74,10 @@ case class Join (table: String, predicate: String, params: Seq[SqlParam[_]]) {
 sealed abstract class SqlS (val sql: String) {
   override def toString = getClass.getName + "(" + sql + ")"
 }
-class ExprS      (s: String) extends SqlS(s)
-class FromS      (s: String) extends SqlS(s)
-class JoinS      (s: String, val params: Seq[SqlParam[_]]) extends SqlS(s)
+class ExprS       (s: String) extends SqlS(s)
+class SelectExprS (s: String) extends SqlS(s)
+class FromS       (s: String) extends SqlS(s)
+class JoinS       (s: String, val params: Seq[SqlParam[_]]) extends SqlS(s)
 
 class PredicateS (s: String, val params: Seq[SqlParam[_]]) extends SqlS(s) {
   def onParams (p: SqlParam[_]*): PredicateS = new PredicateS(s, params ++ p.toSeq)
@@ -138,7 +140,7 @@ case class Query (
   limit:      Option[Int]     = None,
   offset:     Option[Int]     = None
 ) {
-  def select (cols: ExprS*)   = copy(sel = cols.map(_.sql).toList)
+  def select (cols: SelectExprS*)   = copy(sel = cols.map(_.sql).toList)
   def addCols (cols: ExprS*)  = copy(sel = sel ++ cols.map(_.sql).toList)
   def innerJoin (join: JoinS) = copy(joins = joins ++ List("INNER JOIN " + join.sql), params = this.params ++ join.params )
   def leftJoin (join: JoinS)  = copy(joins = joins ++ List("LEFT JOIN " + join.sql), params = this.params ++ join.params)

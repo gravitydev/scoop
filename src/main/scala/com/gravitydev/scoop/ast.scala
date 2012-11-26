@@ -36,7 +36,7 @@ sealed trait SqlExpr [X] extends Sql {
 }
 
 abstract class SqlTable [T <: SqlTable[T]](_companion: TableCompanion[T], tableName: String = null) {self: T =>
-  val _tableName = Option(tableName) getOrElse _companion.getClass.getCanonicalName.split('.').last.stripSuffix("$")
+  val _tableName = Option(tableName) getOrElse _companion.getClass.getCanonicalName.split('.').last.split('$').last
   
   // Mutable for convenience
   // should only be changed by scoop
