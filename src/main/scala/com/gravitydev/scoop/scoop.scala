@@ -101,11 +101,11 @@ trait ResultSetParser[+T] extends (ResultSet => ParseResult[T]) {self =>
     def apply (rs: ResultSet) = self(rs) map fn
     def columns = self.columns
   }
+  /* WARNING: resulting parser won't accumulate columns */
   def flatMap [X] (fn: T => ResultSetParser[X]): ResultSetParser[X] = new ResultSetParser [X] {
     def apply (rs: ResultSet) = for (x <- self(rs); y <- fn(x)(rs)) yield y
     def columns = self.columns 
   }
-  
   def columns: List[query.SelectExprS]
 }
 
