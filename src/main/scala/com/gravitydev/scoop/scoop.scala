@@ -7,11 +7,22 @@ object `package` {
   type Table[T <: ast.SqlTable[T]] = ast.SqlTable[T]
   type TableCompanion[T <: Table[T]] = {def apply() : T}
 
+  /* broken
   def opt [T](p: ResultSetParser[T]): ResultSetParser[Option[T]] = new ResultSetParser [Option[T]] {
     def columns = p.columns
     def apply (rs: ResultSet) = p(rs) match {
       case Success(s) => Success(Option(s))
       case Failure(e) => Success(None)
+    }
+  }
+  */
+  
+  def opt [T](p: ResultSetParser[T]): boilerplate.ParserBase[Option[T]] = {
+    new boilerplate.ParserBase [Option[T]] (rs => p(rs) match {
+      case Success(s) => Success(Option(s))
+      case Failure(e) => Success(None)
+    }) {
+      def columns = p.columns
     }
   }
 
@@ -85,7 +96,7 @@ case class SqlSetParam [T](v: Set[T])(implicit tp: SqlType[T]) extends SqlParam[
   def apply (stmt: PreparedStatement, idx: Int) = error("WTF!")
 }
 
-trait ResultSetParser[T] extends (ResultSet => ParseResult[T]) {self =>
+trait ResultSetParser[+T] extends (ResultSet => ParseResult[T]) {self =>
   def map [X] (fn: T => X): ResultSetParser[X] = new ResultSetParser [X] {
     def apply (rs: ResultSet) = self(rs) map fn
     def columns = self.columns
