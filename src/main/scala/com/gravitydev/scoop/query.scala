@@ -67,7 +67,7 @@ object `package` {
       }
     }
   } catch {
-    case e: java.sql.SQLException => throw new Exception("SQL Exception ["+e.getMessage+"] when executing query ["+query.sql+"] with parameterss: ["+query.params+"]")
+    case e: java.sql.SQLException => throw new Exception("SQL Exception ["+e.getMessage+"] when executing query ["+query.sql+"] with parameters: ["+query.params+"]")
   }
   
   
