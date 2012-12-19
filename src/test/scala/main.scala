@@ -41,6 +41,10 @@ class ScoopSuite extends FunSuite {
     println("USER COLS")
     println(issueParser.columns.map(_.sql))
     println("DONE")
+  
+    val num = "SELECT 1 as num FROM users WHERE 1 = ?".onParams(1) map int("num") head
+
+    println(num)
  
     val q = from(i)
       .innerJoin (u on i.reported_by === u.id)

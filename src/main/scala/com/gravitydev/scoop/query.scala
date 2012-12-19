@@ -16,6 +16,7 @@ object `package` {
   implicit def toSelectExpr (s: String)   = new SelectExprS(s)
   implicit def toJoin (s: String)         = new JoinS(s, Nil)
   implicit def toPredicate (s: String)    = new PredicateS(s, Nil)
+  implicit def predicateToQueryS (p: PredicateS) = new QueryS(p.sql, p.params)
   implicit def toOrder (s: String)        = new OrderByS(s)
   
   implicit def colToExprS (col: SqlCol[_])        = new ExprS(col.sql)
@@ -51,6 +52,24 @@ object `package` {
   }
     
   private [this] def aliasing [T](fn: Aliaser => T) = fn(new Aliaser)
+
+  def executeQuery [B](query: QueryS)(process: ResultSet => ParseResult[B])(implicit c: Connection): List[B] = try {
+    util.using (c.prepareStatement(query.sql)) {statement =>
+      for ((p, idx) <- query.params.zipWithIndex) p(statement, idx+1)
+      
+      util.using (statement.executeQuery()) {results => 
+        util.bmap(results.next) { 
+          process(results) match {
+            case Success(v) => v
+            case Failure(e) => error("Scoop Parse Error: " + e)
+          }
+        }
+      }
+    }
+  } catch {
+    case e: java.sql.SQLException => throw new Exception("SQL Exception ["+e.getMessage+"] when executing query ["+query.sql+"] with parameterss: ["+query.params+"]")
+  }
+  
   
   private type TC[A <: Table[A]] = TableCompanion[A]
   
@@ -64,6 +83,14 @@ object `package` {
   def using [R, A <: Table[A], B <: Table[B], C <: Table[C], D <: Table[D], E <: Table[E], F <: Table[F], G <: Table[G], H <: Table[H]](a: TC[A], b: TC[B], c: TC[C], d: TC[D], e: TC[E], f: TC[F], g: TC[G], h: TC[H])(fn: (A,B,C,D,E,F,G,H)=>R) = aliasing(x => fn(x(a), x(b), x(c), x(d), x(e), x(f), x(g), x(h)))
   def using [R, A <: Table[A], B <: Table[B], C <: Table[C], D <: Table[D], E <: Table[E], F <: Table[F], G <: Table[G], H <: Table[H], I <: Table[I]](a: TC[A], b: TC[B], c: TC[C], d: TC[D], e: TC[E], f: TC[F], g: TC[G], h: TC[H], i: TC[I])(fn: (A,B,C,D,E,F,G,H,I)=>R) = aliasing(x => fn(x(a), x(b), x(c), x(d), x(e), x(f), x(g), x(h), x(i)))
   def using [R, A <: Table[A], B <: Table[B], C <: Table[C], D <: Table[D], E <: Table[E], F <: Table[F], G <: Table[G], H <: Table[H], I <: Table[I], J <: Table[J]](a: TC[A], b: TC[B], c: TC[C], d: TC[D], e: TC[E], f: TC[F], g: TC[G], h: TC[H], i: TC[I], j: TC[J])(fn: (A,B,C,D,E,F,G,H,I,J)=>R) = aliasing(x => fn(x(a), x(b), x(c), x(d), x(e), x(f), x(g), x(h), x(i), x(j)))
+  def using [R, A <: Table[A], B <: Table[B], C <: Table[C], D <: Table[D], E <: Table[E], F <: Table[F], G <: Table[G], H <: Table[H], I <: Table[I], J <: Table[J], K <: Table[K]](a: TC[A], b: TC[B], c: TC[C], d: TC[D], e: TC[E], f: TC[F], g: TC[G], h: TC[H], i: TC[I], j: TC[J], k: TC[K])(fn: (A,B,C,D,E,F,G,H,I,J,K)=>R) = aliasing(x => fn(x(a), x(b), x(c), x(d), x(e), x(f), x(g), x(h), x(i), x(j), x(k)))
+  def using [R, A <: Table[A], B <: Table[B], C <: Table[C], D <: Table[D], E <: Table[E], F <: Table[F], G <: Table[G], H <: Table[H], I <: Table[I], J <: Table[J], K <: Table[K], L <: Table[L]](a: TC[A], b: TC[B], c: TC[C], d: TC[D], e: TC[E], f: TC[F], g: TC[G], h: TC[H], i: TC[I], j: TC[J], k: TC[K], l: TC[L])(fn: (A,B,C,D,E,F,G,H,I,J,K,L)=>R) = aliasing(x => fn(x(a), x(b), x(c), x(d), x(e), x(f), x(g), x(h), x(i), x(j), x(k), x(l)))
+  def using [R, A <: Table[A], B <: Table[B], C <: Table[C], D <: Table[D], E <: Table[E], F <: Table[F], G <: Table[G], H <: Table[H], I <: Table[I], J <: Table[J], K <: Table[K], L <: Table[L], M <: Table[M]](a: TC[A], b: TC[B], c: TC[C], d: TC[D], e: TC[E], f: TC[F], g: TC[G], h: TC[H], i: TC[I], j: TC[J], k: TC[K], l: TC[L], m: TC[M])(fn: (A,B,C,D,E,F,G,H,I,J,K,L,M)=>R) = aliasing(x => fn(x(a), x(b), x(c), x(d), x(e), x(f), x(g), x(h), x(i), x(j), x(k), x(l), x(m)))
+  def using [R, A <: Table[A], B <: Table[B], C <: Table[C], D <: Table[D], E <: Table[E], F <: Table[F], G <: Table[G], H <: Table[H], I <: Table[I], J <: Table[J], K <: Table[K], L <: Table[L], M <: Table[M], N <: Table[N]](a: TC[A], b: TC[B], c: TC[C], d: TC[D], e: TC[E], f: TC[F], g: TC[G], h: TC[H], i: TC[I], j: TC[J], k: TC[K], l: TC[L], m: TC[M], n: TC[N])(fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N)=>R) = aliasing(x => fn(x(a), x(b), x(c), x(d), x(e), x(f), x(g), x(h), x(i), x(j), x(k), x(l), x(m), x(n)))
+  def using [R, A <: Table[A], B <: Table[B], C <: Table[C], D <: Table[D], E <: Table[E], F <: Table[F], G <: Table[G], H <: Table[H], I <: Table[I], J <: Table[J], K <: Table[K], L <: Table[L], M <: Table[M], N <: Table[N], O <: Table[O]](a: TC[A], b: TC[B], c: TC[C], d: TC[D], e: TC[E], f: TC[F], g: TC[G], h: TC[H], i: TC[I], j: TC[J], k: TC[K], l: TC[L], m: TC[M], n: TC[N], o: TC[O])(fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O)=>R) = aliasing(x => fn(x(a), x(b), x(c), x(d), x(e), x(f), x(g), x(h), x(i), x(j), x(k), x(l), x(m), x(n), x(o)))
+  def using [R, A <: Table[A], B <: Table[B], C <: Table[C], D <: Table[D], E <: Table[E], F <: Table[F], G <: Table[G], H <: Table[H], I <: Table[I], J <: Table[J], K <: Table[K], L <: Table[L], M <: Table[M], N <: Table[N], O <: Table[O], P <: Table[P]](a: TC[A], b: TC[B], c: TC[C], d: TC[D], e: TC[E], f: TC[F], g: TC[G], h: TC[H], i: TC[I], j: TC[J], k: TC[K], l: TC[L], m: TC[M], n: TC[N], o: TC[O], p: TC[P])(fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P)=>R) = aliasing(x => fn(x(a), x(b), x(c), x(d), x(e), x(f), x(g), x(h), x(i), x(j), x(k), x(l), x(m), x(n), x(o), x(p)))
+  def using [R, A <: Table[A], B <: Table[B], C <: Table[C], D <: Table[D], E <: Table[E], F <: Table[F], G <: Table[G], H <: Table[H], I <: Table[I], J <: Table[J], K <: Table[K], L <: Table[L], M <: Table[M], N <: Table[N], O <: Table[O], P <: Table[P], Q <: Table[Q]](a: TC[A], b: TC[B], c: TC[C], d: TC[D], e: TC[E], f: TC[F], g: TC[G], h: TC[H], i: TC[I], j: TC[J], k: TC[K], l: TC[L], m: TC[M], n: TC[N], o: TC[O], p: TC[P], q: TC[Q])(fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q)=>R) = aliasing(x => fn(x(a), x(b), x(c), x(d), x(e), x(f), x(g), x(h), x(i), x(j), x(k), x(l), x(m), x(n), x(o), x(p), x(q)))
+  def using [R, A <: Table[A], B <: Table[B], C <: Table[C], D <: Table[D], E <: Table[E], F <: Table[F], G <: Table[G], H <: Table[H], I <: Table[I], J <: Table[J], K <: Table[K], L <: Table[L], M <: Table[M], N <: Table[N], O <: Table[O], P <: Table[P], Q <: Table[Q], S <: Table[S]](a: TC[A], b: TC[B], c: TC[C], d: TC[D], e: TC[E], f: TC[F], g: TC[G], h: TC[H], i: TC[I], j: TC[J], k: TC[K], l: TC[L], m: TC[M], n: TC[N], o: TC[O], p: TC[P], q: TC[Q], s: TC[S])(fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,S)=>R) = aliasing(x => fn(x(a), x(b), x(c), x(d), x(e), x(f), x(g), x(h), x(i), x(j), x(k), x(l), x(m), x(n), x(o), x(p), x(q), x(s)))
 }
 
 class TableWrapper [T <: SqlTable[_]](t: T) {
@@ -88,6 +115,10 @@ class PredicateS (s: String, val params: Seq[SqlParam[_]]) extends SqlS(s) {
 
 class OrderByS   (s: String) extends SqlS(s)
 class AssignmentS (s: String, val params: Seq[SqlParam[_]]) extends SqlS(s)
+
+class QueryS (s: String, val params: Seq[SqlParam[_]]) extends SqlS(s) {
+  def map [B](process: ResultSet => ParseResult[B])(implicit c: Connection): List[B] = executeQuery(this)(process)
+}
 
 class InsertBuilder (into: String) {
   def set (assignments: AssignmentS*) = Insert (into, assignments.map(_.sql).toList, assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params})
@@ -141,18 +172,13 @@ case class Query (
   group:      List[String]    = Nil,
   params:     Seq[SqlParam[_]] = Nil,
   limit:      Option[Int]     = None,
-  offset:     Option[Int]     = None
+  offset:     Option[Int]     = None,
+  comment:    Option[String]  = None
 ) {
   def select (cols: SelectExprS*)   = copy(sel = cols.map(_.sql).toList)
   def addCols (cols: ExprS*)  = copy(sel = sel ++ cols.map(_.sql).toList)
   def innerJoin (join: JoinS) = copy(joins = joins ++ List("INNER JOIN " + join.sql), params = this.params ++ join.params )
   def leftJoin (join: JoinS)  = copy(joins = joins ++ List("LEFT JOIN " + join.sql), params = this.params ++ join.params)
-
-  // not sure if these should exist (where methods that overwrite the previous where clause)  
-  //def where (predicate: PredicateS) = copy(predicate = Some(predicate.sql), params = this.params ++ predicate.params)
-
-  // i don't think this is necessary anymore
-  //def where (predicate: SqlExpr[Boolean]) = copy(predicate = Some(predicate.sql), params = this.params ++ predicate.params)
 
   // always append? we'll go with that for now
   def where (pred: PredicateS) = copy(predicate = predicate.map(_ + " AND " + pred.sql).orElse(Some(pred.sql)), params = this.params ++ pred.params)
@@ -161,8 +187,10 @@ case class Query (
   def groupBy (cols: ExprS*) = copy(group = cols.map(_.sql).toList)
   def limit (l: Int): Query = copy(limit = Some(l))
   def offset (o: Int): Query = copy(offset = Some(o))
+  def comment (c: String): Query = copy(comment = Some(c))
   
   def sql = 
+    comment.map(c => "/* " + c + "*/ \n").getOrElse("") +
     "SELECT " + sel.mkString(", \n") + " \n" + 
     "FROM " + from + "\n" +
     joins.mkString("", "\n", "\n") + 
@@ -172,23 +200,8 @@ case class Query (
     limit.map("LIMIT " + _ + "\n").getOrElse("") +
     offset.map("OFFSET " + _ + "\n").getOrElse("")
  
-  def map [B](process: ResultSet => ParseResult[B])(implicit c: Connection): List[B] = try {
-    util.using (c.prepareStatement(sql)) {statement =>
-      for ((p, idx) <- params.zipWithIndex) p(statement, idx+1)
-      
-      util.using (statement.executeQuery()) {results => 
-        util.bmap(results.next) { 
-          process(results) match {
-            case Success(v) => v
-            case Failure(e) => error("Scoop Parse Error: " + e)
-          }
-        }
-      }
-    }
-  } catch {
-    case e: java.sql.SQLException => throw new Exception("SQL Exception ["+e.getMessage+"] when executing query ["+sql+"] with parameterss: ["+params+"]")
-  }
-  
+  def map [B](process: ResultSet => ParseResult[B])(implicit c: Connection): List[B] = executeQuery(new QueryS(sql, params))(process)
+
   override def toString = {
     "Query(sql="+sql+", params=" + renderParams(params) +")"
   }
