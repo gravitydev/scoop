@@ -22,6 +22,7 @@ object `package` {
   implicit def colToExprS (col: SqlCol[_])        = new ExprS(col.sql)
   implicit def colToSelectExprS (col: SqlCol[_])  = new SelectExprS(col.selectSql)
   implicit def tableToFrom (t: SqlTable[_])       = new FromS(t.sql)
+  implicit def tableToUpdate(t: SqlTable[_])      = new UpdateQueryableS(t.updateSql)
   implicit def joinToJoin (j: Join)               = new JoinS(j.sql, j.params)
   implicit def predToPredicateS (pred: SqlExpr[Boolean]) = new PredicateS(pred.sql, pred.params)
   implicit def orderingToOrder (o: SqlOrdering)   = new OrderByS(o.sql)
@@ -33,7 +34,9 @@ object `package` {
   // starting point
   def from (table: FromS) = Query(table.sql)
   def insertInto (table: SqlTable[_]) = new InsertBuilder(table._tableName)
-  def update (table: FromS) = new UpdateBuilder(table)
+  def update (table: UpdateQueryableS) = new UpdateBuilder(table)
+
+  def sql [T] (sql: String) = new SqlRawExpr[T](sql: String)
 
   // safe aliasing
   private class Aliaser {
@@ -104,10 +107,11 @@ case class Join (table: String, predicate: String, params: Seq[SqlParam[_]]) {
 sealed abstract class SqlS (val sql: String) {
   override def toString = getClass.getName + "(" + sql + ")"
 }
-class ExprS       (s: String) extends SqlS(s)
-class SelectExprS (s: String) extends SqlS(s)
-class FromS       (s: String) extends SqlS(s)
-class JoinS       (s: String, val params: Seq[SqlParam[_]]) extends SqlS(s)
+class ExprS           (s: String) extends SqlS(s)
+class SelectExprS     (s: String) extends SqlS(s)
+class FromS           (s: String) extends SqlS(s)
+class UpdateQueryableS (s: String) extends SqlS(s)
+class JoinS           (s: String, val params: Seq[SqlParam[_]]) extends SqlS(s)
 
 class PredicateS (s: String, val params: Seq[SqlParam[_]]) extends SqlS(s) {
   def onParams (p: SqlParam[_]*): PredicateS = new PredicateS(s, params ++ p.toSeq)
@@ -124,7 +128,7 @@ class InsertBuilder (into: String) {
   def set (assignments: AssignmentS*) = Insert (into, assignments.map(_.sql).toList, assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params})
 }
 
-class UpdateBuilder (tb: FromS) {
+class UpdateBuilder (tb: UpdateQueryableS) {
   def set (assignments: AssignmentS*) = Update (tb.sql, assignments.map(_.sql).toList, None, assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params})
 }
 
@@ -205,10 +209,8 @@ case class Query (
   override def toString = {
     "Query(sql="+sql+", params=" + renderParams(params) +")"
   }
-  
-  //def apply ()(implicit con: Connection) = map(rs => rs.)
-  //def single ()(implicit con: Connection) = singleOpt().get
-  //def singleOpt ()(implicit con: Connection) = apply().toList.headOption
+
+  def union (q: QueryS) = (sql + "\n UNION \n" + q.sql) onParams (params ++ q.params :_*)
 }
 
 case class OrderBy (order: String, dir: String = null) {

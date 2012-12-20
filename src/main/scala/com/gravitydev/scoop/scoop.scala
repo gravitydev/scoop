@@ -7,16 +7,6 @@ object `package` {
   type Table[T <: ast.SqlTable[T]] = ast.SqlTable[T]
   type TableCompanion[T <: Table[T]] = {def apply() : T}
 
-  /* broken
-  def opt [T](p: ResultSetParser[T]): ResultSetParser[Option[T]] = new ResultSetParser [Option[T]] {
-    def columns = p.columns
-    def apply (rs: ResultSet) = p(rs) match {
-      case Success(s) => Success(Option(s))
-      case Failure(e) => Success(None)
-    }
-  }
-  */
-  
   def opt [T](p: ResultSetParser[T]): boilerplate.ParserBase[Option[T]] = {
     new boilerplate.ParserBase [Option[T]] (rs => p(rs) match {
       case Success(s) => Success(Option(s))
@@ -63,24 +53,24 @@ private [scoop] sealed trait ParseResult[+T] {
 private [scoop] case class Success [T] (v: T) extends ParseResult[T]
 private [scoop] case class Failure (error: String) extends ParseResult[Nothing]
 
-trait SqlType [T] {self =>
+trait SqlType [+T] {self =>
   def tpe: Int // jdbc sql type
-  def set (stmt: PreparedStatement, idx: Int, value: T): Unit
+  def set [X >: T](stmt: PreparedStatement, idx: Int, value: X): Unit
   def parse (rs: ResultSet, name: String): Option[T]
   def apply (n: String, sql: String = "") = new ExprParser (n, this, sql)
 }
   
-abstract class SqlNativeType[T] (val tpe: Int, get: (ResultSet, String) => T, _set: (PreparedStatement, Int, T) => Unit) extends SqlType [T] with Logging {
-  def set (stmt: PreparedStatement, idx: Int, value: T): Unit = {
+abstract class SqlNativeType[+T] (val tpe: Int, get: (ResultSet, String) => T, _set: (PreparedStatement, Int, T) => Unit) extends SqlType [T] with Logging {
+  def set [X >: T](stmt: PreparedStatement, idx: Int, value: X): Unit = {
     if (value==null) stmt.setNull(idx, tpe)
-    else _set(stmt, idx, value)
+    else _set(stmt, idx, value.asInstanceOf[T])
   }
   def parse (rs: ResultSet, name: String) = Option(get(rs, name)) filter {_ => !rs.wasNull}
 }
 abstract class SqlCustomType[T,N] (from: N => T, to: T => N)(implicit nt: SqlNativeType[N]) extends SqlType[T] {
   def tpe = nt.tpe
   def parse (rs: ResultSet, name: String) = nt.parse(rs, name) map from
-  def set (stmt: PreparedStatement, idx: Int, value: T): Unit = nt.set(stmt, idx, to(value))
+  def set [X >: T](stmt: PreparedStatement, idx: Int, value: X): Unit = nt.set(stmt, idx, to(value.asInstanceOf[T]))
 }
 
 sealed trait SqlParam [T] {
@@ -114,7 +104,7 @@ case class literal [T] (value: T) extends ResultSetParser [T] {
   def apply (rs: ResultSet) = Success(value)
 }
 
-class ExprParser [T] (name: String, exp: SqlType[T], sql: String = "") 
+class ExprParser [+T] (name: String, exp: SqlType[T], sql: String = "") 
     extends boilerplate.ParserBase[T] (exp.parse(_, name) map {Success(_)} getOrElse Failure("Could not parse expression: " + name)) {
   def prefix (pf: String) = new ExprParser (pf+name, exp)
   def columns = List(sql) filter (_!="") map (x => x+" as "+name: query.SelectExprS)
