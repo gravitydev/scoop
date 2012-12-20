@@ -11,6 +11,8 @@ sealed trait SqlExpr [+X] extends Sql {
   def params: List[SqlSingleParam[_,_]]
   
   def === [T >: X] (v: SqlExpr[T]) = SqlInfixExpr[X,T,Boolean](this, v, "=")
+
+  def <> [T >: X] (v: SqlExpr[T]) = SqlInfixExpr[X,T,Boolean](this, v, "<>")
   
   // alias
   def |=| [T >: X] (v: SqlExpr[T]) = === (v)
