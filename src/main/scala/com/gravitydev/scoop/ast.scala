@@ -90,7 +90,6 @@ class SqlNonNullableCol[T](val name: String, val cast: Option[String], table: Sq
   def parse (rs: ResultSet) = sqlType.parse(rs, alias)
   override def toString = "Col(" + selectSql + ")"
   def nullable = new SqlNullableCol(name, cast, table, sqlType)
-  //def := (x: T) = new SqlLiteralAssignment(this, x)(sqlType)
 
   implicit def toExpr (v: T) = SqlLiteralExpr[T](v)(sqlType)
 
@@ -100,7 +99,8 @@ class SqlNonNullableCol[T](val name: String, val cast: Option[String], table: Sq
 class SqlNullableCol[T](val name: String, val cast: Option[String], table: SqlTable[_], sqlType: SqlType[T]) extends SqlCol[T] (cast, table, sqlType) {
   def parse (rs: ResultSet) = Some(sqlType.parse(rs, alias))
   override def toString = "NullableCol("+selectSql+")"
-  //def := (x: Option[T]) = new SqlLiteralAssignment(this, x getOrElse null.asInstanceOf[T])(sqlType) // TODO: yes, this is a hack
+
+  def := (x: Option[SqlExpr[T]]) = new SqlAssignment(this, x getOrElse new SqlRawExpr[Nothing]("NULL"))
 }
 
 case class SqlUnaryPostfixExpr [+L,+T](l: SqlExpr[L], op: String) extends SqlExpr [T] {

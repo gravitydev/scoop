@@ -43,8 +43,6 @@ class ScoopSuite extends FunSuite {
     println("DONE")
   
     val num = "SELECT 1 as num FROM users WHERE 1 = ?".onParams(1) map int("num") head
-:
-    println(num)
  
     val q = from(i)
       .innerJoin (u on i.reported_by === u.id)
@@ -70,7 +68,7 @@ class ScoopSuite extends FunSuite {
     val y = update(i)
       .set(
         i.id          := 4L,
-        i.created_at  := 
+        i.assigned_to := None
       )
       .where(i.item_id === 24)
 
