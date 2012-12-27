@@ -155,16 +155,18 @@ case class Update (
   table: String,
   assignments: List[String] = Nil,
   predicate: Option[String] = None,
-  params: Seq[SqlParam[_]]  = Nil
+  params: Seq[SqlParam[_]]  = Nil,
+  comment: Option[String] = None
 ) {
   def where (pred: PredicateS) = copy(predicate = predicate.map(_ + " AND " + pred.sql).orElse(Some(pred.sql)), params = this.params ++ pred.params)
-  def sql = "UPDATE " + table + " SET " + assignments.mkString(", ") + predicate.map(w => " \nWHERE " + w + "\n").getOrElse("")
+  def sql = comment.map("/* " + _ + "*/\n").getOrElse("") + "UPDATE " + table + " SET " + assignments.mkString(", ") + predicate.map(w => " \nWHERE " + w + "\n").getOrElse("")
   def apply ()(implicit c: Connection) = {
     util.using(c.prepareStatement(sql)) {stmt => 
       for ((p, idx) <- params.zipWithIndex) p(stmt, idx+1)
       stmt.executeUpdate()
     }
   }
+  def comment (c: String): Update = copy(comment = Some(c))
 }
 
 case class Query (
