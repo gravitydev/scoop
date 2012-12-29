@@ -2,7 +2,7 @@ import com.gravitydev.scoop._
 
 object Repo {
   
-  implicit object SqlIssueStatus extends SqlCustomType [IssueStatus, Int] (IssueStatus.apply _, _.id)
+  implicit object issueStatus extends SqlCustomType [IssueStatus, Int] (IssueStatuses.forId _, _.id)
   
   case class issues () extends Table[issues](issues) {
     val id          = col[Long]         ("id")
@@ -25,7 +25,12 @@ object Repo {
     def email       = col[String]       ("email")
   }
   
-  case class IssueStatus(id: Int)
+  sealed abstract class IssueStatus(val id: Int)
+  object IssueStatuses {
+    def forId (x: Int) = if (x==1) Open else Closed
+    object Open extends IssueStatus(1)
+    object Closed extends IssueStatus(2)
+  }
   
   case class User (
     id:   Long,

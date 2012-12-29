@@ -9,6 +9,7 @@ object `package` {
   
   implicit def tableToWrapped [T <: SqlTable[_]] (t: T) = new TableWrapper(t)
   implicit def baseToSqlLit [T](base: T)(implicit sqlType: SqlType[T]) = SqlLiteralExpr(base)
+  implicit def optToSqlLit [T](base: Option[T])(implicit sqlType: SqlType[T]) = base map {x => SqlLiteralExpr(x)}
   implicit def baseToParam [T](base: T)(implicit sqlType: SqlType[T]) = SqlSingleParam(base)
 
   implicit def toFrom (s: String)         = new FromS(s)
@@ -207,6 +208,8 @@ case class Query (
     offset.map("OFFSET " + _ + "\n").getOrElse("")
  
   def map [B](process: ResultSet => ParseResult[B])(implicit c: Connection): List[B] = executeQuery(new QueryS(sql, params))(process)
+
+  def find [B](parser: ResultSetParser[B])(implicit c: Connection): List[B] = select(parser.columns:_*) map parser 
 
   override def toString = {
     "Query(sql="+sql+", params=" + renderParams(params) +")"
