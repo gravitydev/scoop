@@ -35,18 +35,16 @@ class ScoopSuite extends FunSuite {
     val testParser = i.id ~ xparser
 
     val qq = from(i) select(testParser.columns:_*) 
-
-    println(qq)
     
-    println("USER COLS")
-    println(issueParser.columns.map(_.sql))
-    println("DONE")
-  
     val num = "SELECT 1 as num FROM users WHERE 1 = ?".onParams(1) map int("num") head
+
+    val n = i.id |=| intToSqlLongLit(24)
+    println("VALUE")
+    println(n)
  
     val q = from(i)
       .innerJoin (u on i.reported_by === u.id)
-      .where (u.first_name === "alvaro" and i.status == (IssueStatuses.Open : IssueStatus))
+      //.where (u.first_name === "alvaro" and i.status === IssueStatuses.Open and i.status === 24)
       .where("reporter.last_name = ?" onParams "carrasco")
       .orderBy (u.first_name desc, u.last_name asc)
       
@@ -64,8 +62,8 @@ class ScoopSuite extends FunSuite {
     //val v = i.assigned_to  := Some(4L)
     
     val x = insertInto(i).set(
-      i.item_id     := 24L,
-      i.project_id  := 27L
+      i.item_id     := 24,
+      i.project_id  := 27
     )
 
     val assignee: Option[Long] = Option(1L)

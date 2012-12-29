@@ -9,6 +9,7 @@ object `package` {
   
   implicit def tableToWrapped [T <: SqlTable[_]] (t: T) = new TableWrapper(t)
   implicit def baseToSqlLit [T](base: T)(implicit sqlType: SqlType[T]) = SqlLiteralExpr(base)
+  implicit def intToSqlLongLit (base: Int)(implicit sqlType: SqlType[Long]) = SqlLiteralExpr(base: Long)
   implicit def optToSqlLit [T](base: Option[T])(implicit sqlType: SqlType[T]) = base map {x => SqlLiteralExpr(x)}
   implicit def baseToParam [T](base: T)(implicit sqlType: SqlType[T]) = SqlSingleParam(base)
 

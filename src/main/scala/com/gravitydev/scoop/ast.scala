@@ -7,34 +7,34 @@ sealed trait Sql {
   def sql: String
 }
 
-sealed trait SqlExpr [+X] extends Sql {
+sealed trait SqlExpr [X] extends Sql {
   def params: List[SqlSingleParam[_,_]]
   
-  def === [T >: X] (v: SqlExpr[T]) = SqlInfixExpr[X,T,Boolean](this, v, "=")
+  def === (v: SqlExpr[X]) = SqlInfixExpr[X,X,Boolean](this, v, "=")
 
-  def <> [T >: X] (v: SqlExpr[T]) = SqlInfixExpr[X,T,Boolean](this, v, "<>")
+  def <> (v: SqlExpr[X]) = SqlInfixExpr[X,X,Boolean](this, v, "<>")
   
   // alias
-  def |=| [T >: X] (v: SqlExpr[T]) = === (v)
+  def |=| (v: SqlExpr[X]) = === (v)
   
-  def <   [T >: X] (v: SqlExpr[T]) = SqlInfixExpr[X,T,Boolean](this, v, "<")
-  def <=  [T >: X] (v: SqlExpr[T]) = SqlInfixExpr[X,T,Boolean](this, v, "<=")
-  def >   [T >: X] (v: SqlExpr[T]) = SqlInfixExpr[X,T,Boolean](this, v, ">")
-  def >=  [T >: X] (v: SqlExpr[T]) = SqlInfixExpr[X,T,Boolean](this, v, ">=")
+  def <   (v: SqlExpr[X]) = SqlInfixExpr[X,X,Boolean](this, v, "<")
+  def <=  (v: SqlExpr[X]) = SqlInfixExpr[X,X,Boolean](this, v, "<=")
+  def >   (v: SqlExpr[X]) = SqlInfixExpr[X,X,Boolean](this, v, ">")
+  def >=  (v: SqlExpr[X]) = SqlInfixExpr[X,X,Boolean](this, v, ">=")
   
   // it would be nice to have a view bound here
-  def in [T >: X] (v: Set[T])(implicit tp: SqlType[T]) = {
-    SqlInfixExpr[X,Set[T],Boolean](this, SqlLiteralSetExpr(v), "in")
+  def in (v: Set[X])(implicit tp: SqlType[X]) = { // is the implicit needed here
+    SqlInfixExpr[X,Set[X],Boolean](this, SqlLiteralSetExpr(v), "in")
   }
   
-  def and [V](v: SqlExpr[V]) = SqlInfixExpr[X,V,Boolean](this, v, "AND")
-  def or  [V](v: SqlExpr[V]) = SqlInfixExpr[X,V,Boolean](this, v, "OR")
+  def and (v: SqlExpr[Boolean])(implicit ev: SqlExpr[X] =:= SqlExpr[Boolean]) = SqlInfixExpr[Boolean,Boolean,Boolean](ev(this), v, "AND")
+  def or  (v: SqlExpr[Boolean])(implicit ev: SqlExpr[X] =:= SqlExpr[Boolean]) = SqlInfixExpr[Boolean,Boolean,Boolean](ev(this), v, "OR")
   
   def isNull = SqlUnaryPostfixExpr[X,Boolean](this, "IS NULL")
   def isNotNull = SqlUnaryPostfixExpr[X,Boolean](this, "IS NOT NULL")
   
-  def like [V >: X](v: SqlLiteralExpr[String])(implicit ev: V =:= String) = SqlInfixExpr[X,String,Boolean](this, v, "LIKE")
-  def notLike [V >: X](v: SqlLiteralExpr[String])(implicit ev: V =:= String) = SqlInfixExpr[X,String,Boolean](this, v, "NOT LIKE")
+  def like (v: SqlLiteralExpr[String])(implicit ev: X =:= String) = SqlInfixExpr[X,String,Boolean](this, v, "LIKE")
+  def notLike (v: SqlLiteralExpr[String])(implicit ev: X =:= String) = SqlInfixExpr[X,String,Boolean](this, v, "NOT LIKE")
 }
 
 case class SqlRawExpr [X] (sql: String, params: List[SqlSingleParam[_,_]] = Nil) extends SqlExpr[X]
@@ -78,7 +78,7 @@ class SqlAssignment [T](col: SqlCol[T], value: SqlExpr[T]) extends SqlExpr[Unit]
   override def params = value.params
 }
 
-sealed abstract class SqlCol[+T] (cast: Option[String], table: SqlTable[_], sqlType: SqlType[T]) extends SqlExpr[T] {
+sealed abstract class SqlCol[T] (cast: Option[String], table: SqlTable[_], sqlType: SqlType[T]) extends SqlExpr[T] {
   def name: String
   def alias = table._prefix + name
   val params = Nil
@@ -96,15 +96,15 @@ class SqlNonNullableCol[T](val name: String, val cast: Option[String], table: Sq
 class SqlNullableCol[T](val name: String, val cast: Option[String], table: SqlTable[_], sqlType: SqlType[T]) extends SqlCol[T] (cast, table, sqlType) {
   def parse (rs: ResultSet) = Some(sqlType.parse(rs, alias))
   override def toString = "NullableCol("+selectSql+")"
-  def := (x: Option[SqlExpr[T]]) = new SqlAssignment(this, x getOrElse new SqlRawExpr[Nothing]("NULL"))
+  def := (x: Option[SqlExpr[T]]) = new SqlAssignment(this, x getOrElse new SqlRawExpr[T]("NULL"))
 }
 
-case class SqlUnaryPostfixExpr [+L,+T](l: SqlExpr[L], op: String) extends SqlExpr [T] {
+case class SqlUnaryPostfixExpr [L,T](l: SqlExpr[L], op: String) extends SqlExpr [T] {
   def params = l.params
   def sql = "(" + l.sql + " " + op + ")"
 }
 
-case class SqlInfixExpr [+L,+R,+T](l: SqlExpr[L], r: SqlExpr[R], op: String) extends SqlExpr[T] {
+case class SqlInfixExpr [L,R,T](l: SqlExpr[L], r: SqlExpr[R], op: String) extends SqlExpr[T] {
   def params = l.params ++ r.params
   def sql = "(" + l.sql + " " + op + " " + r.sql + ")"
   override def toString = "SqlInfixExpr(sql=" + sql + ", params=" + renderParams(params) + ")"

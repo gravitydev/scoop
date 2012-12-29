@@ -53,24 +53,24 @@ private [scoop] sealed trait ParseResult[+T] {
 private [scoop] case class Success [T] (v: T) extends ParseResult[T]
 private [scoop] case class Failure (error: String) extends ParseResult[Nothing]
 
-trait SqlType [+T] {self =>
+trait SqlType [T] {self =>
   def tpe: Int // jdbc sql type
-  def set [X >: T](stmt: PreparedStatement, idx: Int, value: X): Unit
+  def set (stmt: PreparedStatement, idx: Int, value: T): Unit
   def parse (rs: ResultSet, name: String): Option[T]
   def apply (n: String, sql: String = "") = new ExprParser (n, this, sql)
 }
   
-abstract class SqlNativeType[+T] (val tpe: Int, get: (ResultSet, String) => T, _set: (PreparedStatement, Int, T) => Unit) extends SqlType [T] with Logging {
-  def set [X >: T](stmt: PreparedStatement, idx: Int, value: X): Unit = {
+abstract class SqlNativeType[T] (val tpe: Int, get: (ResultSet, String) => T, _set: (PreparedStatement, Int, T) => Unit) extends SqlType [T] with Logging {
+  def set (stmt: PreparedStatement, idx: Int, value: T): Unit = {
     if (value==null) stmt.setNull(idx, tpe)
-    else _set(stmt, idx, value.asInstanceOf[T])
+    else _set(stmt, idx, value)
   }
   def parse (rs: ResultSet, name: String) = Option(get(rs, name)) filter {_ => !rs.wasNull}
 }
 abstract class SqlCustomType[T,N] (from: N => T, to: T => N)(implicit nt: SqlNativeType[N]) extends SqlType[T] {
   def tpe = nt.tpe
   def parse (rs: ResultSet, name: String) = nt.parse(rs, name) map from
-  def set [X >: T](stmt: PreparedStatement, idx: Int, value: X): Unit = nt.set(stmt, idx, to(value.asInstanceOf[T]))
+  def set (stmt: PreparedStatement, idx: Int, value: T): Unit = nt.set(stmt, idx, to(value))
 }
 
 sealed trait SqlParam [T] {
