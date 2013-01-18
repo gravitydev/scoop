@@ -105,7 +105,7 @@ case class literal [T] (value: T) extends ResultSetParser [T] {
 }
 
 class ExprParser [+T] (name: String, exp: SqlType[T], sql: String = "") 
-    extends boilerplate.ParserBase[T] (exp.parse(_, name) map {Success(_)} getOrElse Failure("Could not parse expression: " + name)) {
+    extends boilerplate.ParserBase[T] (rs => exp.parse(rs, name) map {Success(_)} getOrElse Failure("Could not parse expression: " + name + " [" + exp + "] from " + util.inspectRS(rs))) {
   def prefix (pf: String) = new ExprParser (pf+name, exp)
   def columns = List(sql) filter (_!="") map (x => x+" as "+name: query.SelectExprS)
 }
@@ -113,7 +113,7 @@ class ExprParser [+T] (name: String, exp: SqlType[T], sql: String = "")
 class ColumnParser[T](column: ast.SqlNonNullableCol[T]) 
     extends boilerplate.ParserBase[T] (rs => 
       column parse rs map {Success(_)} getOrElse {
-        Failure("Could not parse column [" + column.name + "] from " + util.inspectRS(rs))
+        Failure("Could not parse column [" + column._alias + "] from " + util.inspectRS(rs))
       }
     ) {
   def name = column.name

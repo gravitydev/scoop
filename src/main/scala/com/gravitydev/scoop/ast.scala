@@ -30,17 +30,25 @@ sealed trait SqlExpr [X] extends Sql {
   def and (v: SqlExpr[Boolean])(implicit ev: SqlExpr[X] =:= SqlExpr[Boolean]) = SqlInfixExpr[Boolean,Boolean,Boolean](ev(this), v, "AND")
   def or  (v: SqlExpr[Boolean])(implicit ev: SqlExpr[X] =:= SqlExpr[Boolean]) = SqlInfixExpr[Boolean,Boolean,Boolean](ev(this), v, "OR")
   
+  // symbolic aliases for better precedence rules
+  def && (v: SqlExpr[Boolean])(implicit ev: SqlExpr[X] =:= SqlExpr[Boolean]) = and(v)
+  def ||  (v: SqlExpr[Boolean])(implicit ev: SqlExpr[X] =:= SqlExpr[Boolean]) = or(v)
+  
   def isNull = SqlUnaryPostfixExpr[X,Boolean](this, "IS NULL")
   def isNotNull = SqlUnaryPostfixExpr[X,Boolean](this, "IS NOT NULL")
   
   def like (v: SqlLiteralExpr[String])(implicit ev: X =:= String) = SqlInfixExpr[X,String,Boolean](this, v, "LIKE")
   def notLike (v: SqlLiteralExpr[String])(implicit ev: X =:= String) = SqlInfixExpr[X,String,Boolean](this, v, "NOT LIKE")
+  
+  // TODO: make this work
+  //def as (alias: String) = new query.SelectExprS(this.sql)
 }
 
 case class SqlRawExpr [X] (sql: String, params: List[SqlSingleParam[_,_]] = Nil) extends SqlExpr[X]
 
-abstract class SqlTable [T <: SqlTable[T]](_companion: TableCompanion[T], tableName: String = null) {self: T =>
+abstract class SqlTable [T <: SqlTable[T]](_companion: TableCompanion[T], tableName: String = null, schema: String = null) {self: T =>
   val _tableName = Option(tableName) getOrElse _companion.getClass.getCanonicalName.split('.').last.split('$').last
+  val _schema = Option(schema)
   
   // Mutable for convenience
   // should only be changed by scoop
@@ -73,30 +81,34 @@ class SqlLiteralAssignment [T](col: SqlCol[T], value: T)(implicit sqlType: SqlTy
   override def params = List(SqlSingleParam(value))
 }
 */
-class SqlAssignment [T](col: SqlCol[T], value: SqlExpr[T]) extends SqlExpr[Unit] {
-  def sql = col.name + " = " + value.sql
+class SqlAssignment [T](val col: SqlCol[T], value: SqlExpr[T]) extends SqlExpr[Unit] {
+  def sql = col.name + " = " + valueSql
+  def valueSql = value.sql + col.cast.map("::" + _).getOrElse("")
   override def params = value.params
 }
 
-sealed abstract class SqlCol[T] (cast: Option[String], table: SqlTable[_], sqlType: SqlType[T]) extends SqlExpr[T] {
+sealed abstract class SqlCol[T] (val cast: Option[String], table: SqlTable[_], sqlType: SqlType[T], alias: String = null) extends SqlExpr[T] {
   def name: String
-  def alias = table._prefix + name
+  def _alias = Option(alias) getOrElse (table._prefix + name)
   val params = Nil
-  def sql = table._alias + "." + name + cast.map("::"+_).getOrElse("")
-  def selectSql = sql + cast.map("::"+_).getOrElse("") + (if (table._prefix!="") " as " + alias else "")
+  def sql = table._alias + "." + name + cast.map(_=>"::varchar").getOrElse("") // TODO: use correct base type
+  def selectSql = sql + (if (table._prefix!="") " as " + _alias else "")
+  def as (s: String): SqlCol[T]
 }
 
-class SqlNonNullableCol[T](val name: String, val cast: Option[String], table: SqlTable[_], sqlType: SqlType[T]) extends SqlCol[T] (cast, table, sqlType) {
-  def parse (rs: ResultSet) = sqlType.parse(rs, alias)
+class SqlNonNullableCol[T](val name: String, cast: Option[String], table: SqlTable[_], sqlType: SqlType[T], alias: String = null) extends SqlCol[T] (cast, table, sqlType, alias) {
+  def parse (rs: ResultSet) = sqlType.parse(rs, _alias)
   override def toString = "Col(" + selectSql + ")"
   def nullable = new SqlNullableCol(name, cast, table, sqlType)
   def := (x: SqlExpr[T]) = new SqlAssignment(this, x)//(sqlType)
+  def as (s: String): SqlNonNullableCol[T] = new SqlNonNullableCol[T](name, cast, table, sqlType, s)
 }
 
-class SqlNullableCol[T](val name: String, val cast: Option[String], table: SqlTable[_], sqlType: SqlType[T]) extends SqlCol[T] (cast, table, sqlType) {
-  def parse (rs: ResultSet) = Some(sqlType.parse(rs, alias))
+class SqlNullableCol[T](val name: String, cast: Option[String], table: SqlTable[_], sqlType: SqlType[T], alias: String = null) extends SqlCol[T] (cast, table, sqlType, alias) {
+  def parse (rs: ResultSet) = Some(sqlType.parse(rs, _alias))
   override def toString = "NullableCol("+selectSql+")"
   def := (x: Option[SqlExpr[T]]) = new SqlAssignment(this, x getOrElse new SqlRawExpr[T]("NULL"))
+  def as (s: String) = new SqlNullableCol[T](name, cast, table, sqlType, s)
 }
 
 case class SqlUnaryPostfixExpr [L,T](l: SqlExpr[L], op: String) extends SqlExpr [T] {

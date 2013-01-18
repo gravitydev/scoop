@@ -3,14 +3,15 @@ import com.gravitydev.scoop._
 object Repo {
   
   implicit object issueStatus extends SqlCustomType [IssueStatus, Int] (IssueStatuses.forId _, _.id)
-  
+ 
+  /** type annotation is not required in scala 2.10 */ 
   case class issues () extends Table[issues](issues) {
     val id          = col[Long]         ("id")
     val project_id  = col[Long]         ("project_id")
     val item_id     = col[Long]         ("item_id")
     val title       = col[String]       ("title")
     val description = col[String]       ("description")
-    val status      = col[IssueStatus]  ("status")
+    val status      = col[IssueStatus]  ("status", cast = "status")
     val reported_by = col[Long]         ("reported_by")
     val assigned_to = col[Long]         ("assigned_to")   nullable
     val release_id  = col[Long]         ("release_id")    nullable
@@ -53,3 +54,4 @@ object Repo {
   }
   
 }
+

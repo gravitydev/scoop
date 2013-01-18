@@ -13,22 +13,52 @@ class ScoopSuite extends FunSuite {
     case class Issue (id: Long, assignee: User)
     
     def userParser (u: users) = u.first_name ~ u.last_name >> User.apply
-    
+
+    val xx = decimal("SOMETHING", "SOMETHING2").columns
+
+    val ids = using (users as "u", issues as "i") {(u,i) =>
+      from(i)
+        .innerJoin(u on i.reported_by === u.id)
+        .limit(10)
+        .find(i.id)
+    }
+    println("*"*50)
+    println(ids)
+
     val res = using (users as "hello") {u =>
-      println(u)
-      println(u.first_name)
+      println("ALIAS")
+      println(u.id as "somethingelse")
       val q = from(u)
         .where(u.email === "")
-        .select(u.first_name)
-      println(q)
-      ""
+        .limit(10)
+        .find(u.first_name)
     }
-    
+
     val u = users as "reporter"
     val i = issues as "i"
+
+    val nums = List(IssueStatuses.Open, IssueStatuses.Closed)
+    val mapped = nums.map(v => i.status === v and i.status === v and i.status === v)
+    val folded = mapped.foldLeft(false : ast.SqlExpr[Boolean])(_ or _)
+
+    println(mapped)
+    println(folded)
+
+    {
+      val x = "(" +~ from(u).where(u.id === 24) +~ ") UNION (" +~ from(i).where(i.id === 13) +~ ")"
+    }
+
+    {
+      val q = from(u).where("u.id IN (" +~ from(u).where(u.id === 2) +~ ")")
+    }    
+
+
     
     val userP = userParser(u)
+ 
     val issueParser = i.id ~ userP >> Issue.apply
+
+    issueParser.columns map println
 
     val xparser = i.id ~ userP ~ long("test", sql="(SELECT 1)")
 
@@ -36,35 +66,33 @@ class ScoopSuite extends FunSuite {
 
     val qq = from(i) select(testParser.columns:_*) 
     
-    val num = "SELECT 1 as num FROM users WHERE 1 = ?".onParams(1) map int("num") head
+    val num = "SELECT 1 as num FROM users WHERE 1 = ?" %? 1 //map int("num") head;
 
     val n = i.id |=| intToSqlLongLit(24)
-    println("VALUE")
-    println(n)
  
     val q = from(i)
       .innerJoin (u on i.reported_by === u.id)
       //.where (u.first_name === "alvaro" and i.status === IssueStatuses.Open and i.status === 24)
-      .where("reporter.last_name = ?" onParams "carrasco")
+      .where("reporter.last_name = ?" %? "carrasco")
       .orderBy (u.first_name desc, u.last_name asc)
-      
-    //println(q)
-      
-    val test = q find issueParser
+
+
+     
+    q find issueParser
     
     //val res = mapped(con)
     
-    //println(test)
-    //println(res)
     val j: Option[Long] = Some(4L)
     val v = i.assigned_to  := j
 
     //val v = i.assigned_to  := Some(4L)
     
-    val x = insertInto(i).set(
+    val x = insertInto(i).values(
       i.item_id     := 24,
-      i.project_id  := 27
+      i.project_id  := 27,
+      i.status      := IssueStatuses.Open
     )
+
 
     val assignee: Option[Long] = Option(1L)
   
@@ -76,12 +104,12 @@ class ScoopSuite extends FunSuite {
       )
       .where(i.item_id === 24)
 
-    println(y.sql)
-    println(y.params)
-    
-    println(x.sql)
-    println(x.params)
     */
+
+    val vx = from(i)
+      .select( (int("test", sql="1") >> {x => x}).columns:_* )
+
+    println(vx.sql)
     
   }
 

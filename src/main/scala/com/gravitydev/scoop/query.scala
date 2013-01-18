@@ -9,7 +9,7 @@ object `package` {
   
   implicit def tableToWrapped [T <: SqlTable[_]] (t: T) = new TableWrapper(t)
   implicit def baseToSqlLit [T](base: T)(implicit sqlType: SqlType[T]) = SqlLiteralExpr(base)
-  implicit def intToSqlLongLit (base: Int)(implicit sqlType: SqlType[Long]) = SqlLiteralExpr(base: Long)
+  implicit def intToSqlLongLit (base: Int): SqlLiteralExpr[Long] = SqlLiteralExpr(base: Long)
   implicit def optToSqlLit [T](base: Option[T])(implicit sqlType: SqlType[T]) = base map {x => SqlLiteralExpr(x)}
   implicit def baseToParam [T](base: T)(implicit sqlType: SqlType[T]) = SqlSingleParam(base)
 
@@ -18,7 +18,9 @@ object `package` {
   implicit def toSelectExpr (s: String)   = new SelectExprS(s)
   implicit def toJoin (s: String)         = new JoinS(s, Nil)
   implicit def toPredicate (s: String)    = new PredicateS(s, Nil)
+  implicit def toQuery (s: String)        = new QueryS(s, Seq())
   implicit def predicateToQueryS (p: PredicateS) = new QueryS(p.sql, p.params)
+  implicit def querySToPredicate (p: QueryS) = new PredicateS(p.sql, p.params)
   implicit def toOrder (s: String)        = new OrderByS(s)
   
   implicit def colToExprS (col: SqlCol[_])        = new ExprS(col.sql)
@@ -29,6 +31,7 @@ object `package` {
   implicit def predToPredicateS (pred: SqlExpr[Boolean]) = new PredicateS(pred.sql, pred.params)
   implicit def orderingToOrder (o: SqlOrdering)   = new OrderByS(o.sql)
   implicit def assignmentToAssignmentS (a: SqlAssignment[_]) = new AssignmentS(a.sql, a.params)
+  implicit def queryToQueryS (q: Query)           = new QueryS(q.sql, q.params)
   
   implicit def listToExpr (l: List[String]) = l.map(x => x: ExprS)
   implicit def companionToTable [T <: ast.SqlTable[T]] (companion: {def apply (): T}): T = companion()
@@ -37,6 +40,7 @@ object `package` {
   def from (table: FromS) = Query(table.sql)
   def insertInto (table: SqlTable[_]) = new InsertBuilder(table._tableName)
   def update (table: UpdateQueryableS) = new UpdateBuilder(table)
+  def deleteFrom (table: UpdateQueryableS) = new DeleteBuilder(table)
 
   def sql [T] (sql: String) = new SqlRawExpr[T](sql: String)
 
@@ -106,51 +110,82 @@ case class Join (table: String, predicate: String, params: Seq[SqlParam[_]]) {
   def sql = table + " ON " + predicate
 }
 
-sealed abstract class SqlS (val sql: String) {
-  override def toString = getClass.getName + "(" + sql + ")"
+sealed abstract class SqlS (val sql: String, val params: Seq[SqlParam[_]] = Seq()) {
+  override def toString = getClass.getName + "(sql="+sql+", params="+params+")" 
 }
 class ExprS           (s: String) extends SqlS(s)
 class SelectExprS     (s: String) extends SqlS(s)
 class FromS           (s: String) extends SqlS(s)
 class UpdateQueryableS (s: String) extends SqlS(s)
-class JoinS           (s: String, val params: Seq[SqlParam[_]]) extends SqlS(s)
+class JoinS           (s: String, params: Seq[SqlParam[_]]) extends SqlS(s, params)
 
-class PredicateS (s: String, val params: Seq[SqlParam[_]]) extends SqlS(s) {
-  def onParams (p: SqlParam[_]*): PredicateS = new PredicateS(s, params ++ p.toSeq)
+class PredicateS (s: String, params: Seq[SqlParam[_]]) extends SqlS(s, params) {
 }
 
 class OrderByS   (s: String) extends SqlS(s)
-class AssignmentS (s: String, val params: Seq[SqlParam[_]]) extends SqlS(s)
+class AssignmentS (s: String, params: Seq[SqlParam[_]]) extends SqlS(s, params)
 
-class QueryS (s: String, val params: Seq[SqlParam[_]]) extends SqlS(s) {
+class QueryS (s: String, params: Seq[SqlParam[_]]) extends SqlS(s, params) {
   def map [B](process: ResultSet => ParseResult[B])(implicit c: Connection): List[B] = executeQuery(this)(process)
+  def +~ (s: QueryS) = new QueryS(sql + s.sql, params ++ s.params)
+  def onParams (p: SqlParam[_]*): PredicateS = new PredicateS(s, params ++ p.toSeq)
+  def %? (p: SqlParam[_]*) = onParams(p:_*)
 }
 
 class InsertBuilder (into: String) {
   def set (assignments: AssignmentS*) = Insert (into, assignments.map(_.sql).toList, assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params})
+  def values (assignments: SqlAssignment[_]*) = Insert2(into, assignments.toList)
 }
 
 class UpdateBuilder (tb: UpdateQueryableS) {
   def set (assignments: AssignmentS*) = Update (tb.sql, assignments.map(_.sql).toList, None, assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params})
 }
 
+class DeleteBuilder (tb: UpdateQueryableS) {
+  def where (pred: PredicateS) = new Delete(tb.sql, pred.sql, params = pred.params)
+}
+
+sealed trait InsertBase {
+  def params: Seq[SqlParam[_]]
+  def sql: String
+  def apply ()(implicit c: Connection) = try {
+    import java.sql.Statement
+    util.using(c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {stmt => 
+      for ((p, idx) <- params.zipWithIndex) p(stmt, idx+1)
+      stmt.executeUpdate()
+
+      // TODO: this is a hack, do this right
+      try util.using(stmt.getGeneratedKeys()) {rs =>
+        rs.next()
+        Some(rs.getLong(1))
+      } catch {
+        case _ => None
+      }
+    }
+  } catch {
+    case e: java.sql.SQLException => throw new Exception("SQL Exception ["+e.getMessage+"] when executing query ["+sql+"] with parameters: ["+params+"]")
+  }
+}
+
 case class Insert (
   into: String,
   assignments: List[String] = Nil,
-  params: Seq[SqlParam[_]] = Nil
-) {
+  params: Seq[SqlParam[_]] = Nil,
+  comment: Option[String] = None
+) extends InsertBase {
+  def comment (c: String): Insert = copy(comment = Some(c))
   def sql = "INSERT INTO " + into + " SET " + assignments.mkString(", ")
-  def apply ()(implicit c: Connection) = {
-    import java.sql.Statement
-    util.using(c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {stmt => 
-      stmt.executeUpdate()
+}
 
-      util.using(stmt.getGeneratedKeys()) {rs =>
-        rs.next()
-        rs.getLong(1)
-      }
-    }
-  }
+// alternate syntax
+case class Insert2 (
+  into: String,
+  assignments: List[SqlAssignment[_]],
+  comment: Option[String] = None
+) extends InsertBase {
+  def comment (c: String): Insert2 = copy(comment = Some(c))
+  def params = assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params}
+  def sql = "INSERT INTO " + into + " (" + assignments.map(_.col.name).mkString(", ") + ") VALUES (" + assignments.map(_.valueSql).mkString(", ") + ")"
 }
 
 case class Update (
@@ -162,13 +197,31 @@ case class Update (
 ) {
   def where (pred: PredicateS) = copy(predicate = predicate.map(_ + " AND " + pred.sql).orElse(Some(pred.sql)), params = this.params ++ pred.params)
   def sql = comment.map("/* " + _ + "*/\n").getOrElse("") + "UPDATE " + table + " SET " + assignments.mkString(", ") + predicate.map(w => " \nWHERE " + w + "\n").getOrElse("")
+
+  def apply ()(implicit c: Connection) = try util.using(c.prepareStatement(sql)) {stmt => 
+    for ((p, idx) <- params.zipWithIndex) p(stmt, idx+1)
+    stmt.executeUpdate()
+  } catch {
+    case e: java.sql.SQLException => throw new Exception("SQL Exception ["+e.getMessage+"] when executing query ["+sql+"] with parameters: ["+params+"]")
+  }
+
+  def comment (c: String): Update = copy(comment = Some(c))
+}
+
+case class Delete (
+  table: String,
+  predicate: String,
+  params: Seq[SqlParam[_]] = Nil,
+  comment: Option[String] = None
+) {
+  def where (pred: PredicateS) = copy(predicate = predicate + " AND " + pred.sql, params = this.params ++ pred.params)
+  def sql = comment.map("/* " + _ + "*/\n").getOrElse("") + "DELETE FROM " + table + "\nWHERE " + predicate + "\n"
   def apply ()(implicit c: Connection) = {
     util.using(c.prepareStatement(sql)) {stmt => 
       for ((p, idx) <- params.zipWithIndex) p(stmt, idx+1)
       stmt.executeUpdate()
     }
   }
-  def comment (c: String): Update = copy(comment = Some(c))
 }
 
 case class Query (
@@ -181,9 +234,11 @@ case class Query (
   params:     Seq[SqlParam[_]] = Nil,
   limit:      Option[Int]     = None,
   offset:     Option[Int]     = None,
-  comment:    Option[String]  = None
+  comment:    Option[String]  = None,
+  distinct:   Boolean         = false
 ) {
   def select (cols: SelectExprS*)   = copy(sel = cols.map(_.sql).toList)
+  def selectDistinct (cols: SelectExprS*) = copy(sel = cols.map(_.sql).toList, distinct=true)
   def addCols (cols: ExprS*)  = copy(sel = sel ++ cols.map(_.sql).toList)
   def innerJoin (join: JoinS) = copy(joins = joins ++ List("INNER JOIN " + join.sql), params = this.params ++ join.params )
   def leftJoin (join: JoinS)  = copy(joins = joins ++ List("LEFT JOIN " + join.sql), params = this.params ++ join.params)
@@ -199,7 +254,7 @@ case class Query (
   
   def sql = 
     comment.map(c => "/* " + c + "*/ \n").getOrElse("") +
-    "SELECT " + sel.mkString(", \n") + " \n" + 
+    "SELECT " + (if (distinct) "DISTINCT " else "") + sel.mkString(", \n") + " \n" + 
     "FROM " + from + "\n" +
     joins.mkString("", "\n", "\n") + 
     predicate.map(w => "WHERE " + w + "\n").getOrElse("") + 
@@ -211,12 +266,16 @@ case class Query (
   def map [B](process: ResultSet => ParseResult[B])(implicit c: Connection): List[B] = executeQuery(new QueryS(sql, params))(process)
 
   def find [B](parser: ResultSetParser[B])(implicit c: Connection): List[B] = select(parser.columns:_*) map parser 
+  def findDistinct [B](parser: ResultSetParser[B])(implicit c: Connection): List[B] = selectDistinct(parser.columns:_*) map parser 
 
   override def toString = {
     "Query(sql="+sql+", params=" + renderParams(params) +")"
   }
 
   def union (q: QueryS) = (sql + "\n UNION \n" + q.sql) onParams (params ++ q.params :_*)
+  
+  // useful for subqueries
+  def as (alias: String) = "(" +~ queryToQueryS(this) +~ ") as " +~ alias
 }
 
 case class OrderBy (order: String, dir: String = null) {
