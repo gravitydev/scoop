@@ -235,9 +235,11 @@ case class Query (
   limit:      Option[Int]     = None,
   offset:     Option[Int]     = None,
   comment:    Option[String]  = None,
-  distinct:   Boolean         = false
+  distinct:   Boolean         = false,
+  forUpdateLock:  Boolean         = false
 ) {
   def select (cols: SelectExprS*)   = copy(sel = cols.map(_.sql).toList)
+  def forUpdate ()            = copy(forUpdateLock = true)
   def selectDistinct (cols: SelectExprS*) = copy(sel = cols.map(_.sql).toList, distinct=true)
   def addCols (cols: ExprS*)  = copy(sel = sel ++ cols.map(_.sql).toList)
   def innerJoin (join: JoinS) = copy(joins = joins ++ List("INNER JOIN " + join.sql), params = this.params ++ join.params )
@@ -261,7 +263,8 @@ case class Query (
     (if (group.nonEmpty) group.mkString("GROUP BY ", ", ", "\n") else "") +
     order.map("ORDER BY " + _ + "\n").getOrElse("") +
     limit.map("LIMIT " + _ + "\n").getOrElse("") +
-    offset.map("OFFSET " + _ + "\n").getOrElse("")
+    offset.map("OFFSET " + _ + "\n").getOrElse("") + 
+    (if (forUpdateLock) "FOR UPDATE \n" else "")
  
   def map [B](process: ResultSet => ParseResult[B])(implicit c: Connection): List[B] = executeQuery(new QueryS(sql, params))(process)
 

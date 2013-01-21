@@ -1,22 +1,23 @@
 import org.scalatest.FunSuite
-
 import com.gravitydev.scoop._, query._
 
 class ScoopSuite extends FunSuite {
-  import Repo._
-  
+  import sample.Data._
+  import sample.Models._
+  import sample.Parsers
+
   Class forName "com.mysql.jdbc.Driver"
-  implicit val con = java.sql.DriverManager.getConnection("jdbc:mysql://localhost/gravitydev", "root", "")
+  implicit lazy val con = java.sql.DriverManager.getConnection("jdbc:mysql://localhost/gravitydev", "root", "")
+  
+  test ("Basic Functions") {
+    // addition
+    //val s: SelectExprS = (1: ast.SqlExpr[Int]) + 2
+  }
   
   test ("query API") {
-    case class User (first: String, last: String)
-    case class Issue (id: Long, assignee: User)
-    
-    def userParser (u: users) = u.first_name ~ u.last_name >> User.apply
-
     val xx = decimal("SOMETHING", "SOMETHING2").columns
 
-    val ids = using (users as "u", issues as "i") {(u,i) =>
+    val ids = using (tables.users as "u", tables.issues as "i") {(u,i) =>
       from(i)
         .innerJoin(u on i.reported_by === u.id)
         .limit(10)
@@ -25,7 +26,7 @@ class ScoopSuite extends FunSuite {
     println("*"*50)
     println(ids)
 
-    val res = using (users as "hello") {u =>
+    val res = using (tables.users as "hello") {u =>
       println("ALIAS")
       println(u.id as "somethingelse")
       val q = from(u)
@@ -34,8 +35,8 @@ class ScoopSuite extends FunSuite {
         .find(u.first_name)
     }
 
-    val u = users as "reporter"
-    val i = issues as "i"
+    val u = tables.users as "reporter"
+    val i = tables.issues as "i"
 
     val nums = List(IssueStatuses.Open, IssueStatuses.Closed)
     val mapped = nums.map(v => i.status === v and i.status === v and i.status === v)
@@ -54,9 +55,9 @@ class ScoopSuite extends FunSuite {
 
 
     
-    val userP = userParser(u)
+    val userP = Parsers.user(u)
  
-    val issueParser = i.id ~ userP >> Issue.apply
+    val issueParser = i.id ~ i.status ~ userP ~ opt(userP) >> Issue.apply
 
     issueParser.columns map println
 
@@ -114,6 +115,8 @@ class ScoopSuite extends FunSuite {
   }
 
   test ("utils") {
+    
+  implicit lazy val con = java.sql.DriverManager.getConnection("jdbc:mysql://localhost/gravitydev", "root", "")
     util.processQuery("SELECT 1 as first, 2 as second, 'something' as ha") {rs =>
       println(util.inspectRS(rs))
     }
