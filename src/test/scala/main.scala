@@ -1,20 +1,35 @@
-import org.scalatest.FunSuite
+import org.scalatest.FlatSpec
+import org.scalatest.matchers.ShouldMatchers._
 import com.gravitydev.scoop._, query._
 
-class ScoopSuite extends FunSuite {
+class ScoopSpec extends FlatSpec {
   import sample.Data._
   import sample.Models._
   import sample.Parsers
+  import ScoopMatchers._
 
   Class forName "com.mysql.jdbc.Driver"
   implicit lazy val con = java.sql.DriverManager.getConnection("jdbc:mysql://localhost/gravitydev", "root", "")
   
-  test ("Basic Functions") {
+  "Basic Functions" should "work" in {
     // addition
-    //val s: SelectExprS = (1: ast.SqlExpr[Int]) + 2
+    {
+      val x: SelectExprS = (1: ast.SqlExpr[Int]) + 2
+      x should matchSql("(? + ?)", 1, 2)
+    }
+    {
+      val x: SelectExprS = (1: ast.SqlExpr[Int]) - 2
+      x should matchSql("(? - ?)", 1, 2)
+    }
   }
   
-  test ("query API") {
+  "Implicits" should "work" in {
+    using (tables.issues as "i") {i =>
+      i.id + 1 as "test"
+    }
+  }
+  
+  "Query API" should "work" in {
     val xx = decimal("SOMETHING", "SOMETHING2").columns
 
     val ids = using (tables.users as "u", tables.issues as "i") {(u,i) =>
@@ -114,9 +129,7 @@ class ScoopSuite extends FunSuite {
     
   }
 
-  test ("utils") {
-    
-  implicit lazy val con = java.sql.DriverManager.getConnection("jdbc:mysql://localhost/gravitydev", "root", "")
+  "utils" should "work" in {
     util.processQuery("SELECT 1 as first, 2 as second, 'something' as ha") {rs =>
       println(util.inspectRS(rs))
     }

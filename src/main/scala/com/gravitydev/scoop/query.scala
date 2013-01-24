@@ -6,6 +6,10 @@ import scala.collection.mutable.ListBuffer
 import collection._, ast._
 
 object `package` {
+  type Predicate = ast.SqlExpr[Boolean]
+  
+  implicit def stringToFragment (s: String) = new SqlFragmentS(s)
+  implicit def fromExpr (expr: ast.SqlExpr[_]) = new ExprS(expr.sql, expr.params)
   
   implicit def tableToWrapped [T <: SqlTable[_]] (t: T) = new TableWrapper(t)
   implicit def baseToSqlLit [T](base: T)(implicit sqlType: SqlType[T]) = SqlLiteralExpr(base)
@@ -13,19 +17,13 @@ object `package` {
   implicit def optToSqlLit [T](base: Option[T])(implicit sqlType: SqlType[T]) = base map {x => SqlLiteralExpr(x)}
   implicit def baseToParam [T](base: T)(implicit sqlType: SqlType[T]) = SqlSingleParam(base)
 
-  implicit def toFrom (s: String)         = new FromS(s)
-  implicit def toExpr (s: String)         = new ExprS(s)
-  implicit def toSelectExpr (s: String)   = new SelectExprS(s)
   implicit def toJoin (s: String)         = new JoinS(s, Nil)
   implicit def toPredicate (s: String)    = new PredicateS(s, Nil)
-  implicit def toQuery (s: String)        = new QueryS(s, Seq())
+  //implicit def toQuery (s: String)        = new QueryS(s, Seq())
   implicit def predicateToQueryS (p: PredicateS) = new QueryS(p.sql, p.params)
   implicit def querySToPredicate (p: QueryS) = new PredicateS(p.sql, p.params)
   implicit def toOrder (s: String)        = new OrderByS(s)
   
-  implicit def colToExprS (col: SqlCol[_])        = new ExprS(col.sql)
-  implicit def colToSelectExprS (col: SqlCol[_])  = new SelectExprS(col.selectSql)
-  implicit def tableToFrom (t: SqlTable[_])       = new FromS(t.sql)
   implicit def tableToUpdate(t: SqlTable[_])      = new UpdateQueryableS(t.updateSql)
   implicit def joinToJoin (j: Join)               = new JoinS(j.sql, j.params)
   implicit def predToPredicateS (pred: SqlExpr[Boolean]) = new PredicateS(pred.sql, pred.params)
@@ -42,7 +40,8 @@ object `package` {
   def update (table: UpdateQueryableS) = new UpdateBuilder(table)
   def deleteFrom (table: UpdateQueryableS) = new DeleteBuilder(table)
 
-  def sql [T] (sql: String) = new SqlRawExpr[T](sql: String)
+  def sql [T] (sql: String) = new SqlRawExpr[T](sql, Nil)
+  def sql [T] (sql: SqlS) = new SqlRawExpr[T](sql.sql, sql.params)
 
   // safe aliasing
   private class Aliaser {
@@ -108,28 +107,6 @@ class TableWrapper [T <: SqlTable[_]](t: T) {
 
 case class Join (table: String, predicate: String, params: Seq[SqlParam[_]]) {
   def sql = table + " ON " + predicate
-}
-
-sealed abstract class SqlS (val sql: String, val params: Seq[SqlParam[_]] = Seq()) {
-  override def toString = getClass.getName + "(sql="+sql+", params="+params+")" 
-}
-class ExprS           (s: String) extends SqlS(s)
-class SelectExprS     (s: String) extends SqlS(s)
-class FromS           (s: String) extends SqlS(s)
-class UpdateQueryableS (s: String) extends SqlS(s)
-class JoinS           (s: String, params: Seq[SqlParam[_]]) extends SqlS(s, params)
-
-class PredicateS (s: String, params: Seq[SqlParam[_]]) extends SqlS(s, params) {
-}
-
-class OrderByS   (s: String) extends SqlS(s)
-class AssignmentS (s: String, params: Seq[SqlParam[_]]) extends SqlS(s, params)
-
-class QueryS (s: String, params: Seq[SqlParam[_]]) extends SqlS(s, params) {
-  def map [B](process: ResultSet => ParseResult[B])(implicit c: Connection): List[B] = executeQuery(this)(process)
-  def +~ (s: QueryS) = new QueryS(sql + s.sql, params ++ s.params)
-  def onParams (p: SqlParam[_]*): PredicateS = new PredicateS(s, params ++ p.toSeq)
-  def %? (p: SqlParam[_]*) = onParams(p:_*)
 }
 
 class InsertBuilder (into: String) {
@@ -231,28 +208,31 @@ case class Query (
   predicate:  Option[String]  = None,
   order:      Option[String]  = None,
   group:      List[String]    = Nil,
-  params:     Seq[SqlParam[_]] = Nil,
+  selectParams: Seq[SqlParam[_]] = Nil,
+  queryParams: Seq[SqlParam[_]] = Nil,
   limit:      Option[Int]     = None,
   offset:     Option[Int]     = None,
   comment:    Option[String]  = None,
   distinct:   Boolean         = false,
   forUpdateLock:  Boolean         = false
 ) {
-  def select (cols: SelectExprS*)   = copy(sel = cols.map(_.sql).toList)
+  def select (cols: SelectExprS*)   = copy(sel = cols.map(_.sql).toList, selectParams = cols.map(_.params).flatten)
   def forUpdate ()            = copy(forUpdateLock = true)
   def selectDistinct (cols: SelectExprS*) = copy(sel = cols.map(_.sql).toList, distinct=true)
   def addCols (cols: ExprS*)  = copy(sel = sel ++ cols.map(_.sql).toList)
-  def innerJoin (join: JoinS) = copy(joins = joins ++ List("INNER JOIN " + join.sql), params = this.params ++ join.params )
-  def leftJoin (join: JoinS)  = copy(joins = joins ++ List("LEFT JOIN " + join.sql), params = this.params ++ join.params)
+  def innerJoin (join: JoinS) = copy(joins = joins ++ List("INNER JOIN " + join.sql), queryParams = this.queryParams ++ join.params )
+  def leftJoin (join: JoinS)  = copy(joins = joins ++ List("LEFT JOIN " + join.sql), queryParams = this.queryParams ++ join.params)
 
   // always append? we'll go with that for now
-  def where (pred: PredicateS) = copy(predicate = predicate.map(_ + " AND " + pred.sql).orElse(Some(pred.sql)), params = this.params ++ pred.params)
+  def where (pred: PredicateS) = copy(predicate = predicate.map(_ + " AND " + pred.sql).orElse(Some(pred.sql)), queryParams = this.queryParams ++ pred.params)
 
   def orderBy (order: OrderByS*) = copy(order = Some( (order.toList.map(_.sql)).mkString(", ")) )
   def groupBy (cols: ExprS*) = copy(group = cols.map(_.sql).toList)
   def limit (l: Int): Query = copy(limit = Some(l))
   def offset (o: Int): Query = copy(offset = Some(o))
   def comment (c: String): Query = copy(comment = Some(c))
+  
+  def params = selectParams ++ queryParams
   
   def sql = 
     comment.map(c => "/* " + c + "*/ \n").getOrElse("") +
@@ -284,10 +264,3 @@ case class Query (
 case class OrderBy (order: String, dir: String = null) {
   def sql = order + Option(dir).map(" "+_).getOrElse("")
 }
-
-/*
-trait Predicate {
-  def sql: String
-  def params: List[Any]
-}
-*/

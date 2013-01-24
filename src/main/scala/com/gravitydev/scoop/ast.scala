@@ -8,7 +8,7 @@ sealed trait Sql {
 }
 
 sealed trait SqlExpr [X] extends Sql {
-  def params: List[SqlSingleParam[_,_]]
+  def params: Seq[SqlParam[_]]
   
   def === (v: SqlExpr[X]) = SqlInfixExpr[X,X,Boolean](this, v, "=")
 
@@ -40,14 +40,15 @@ sealed trait SqlExpr [X] extends Sql {
   def like (v: SqlLiteralExpr[String])(implicit ev: X =:= String) = SqlInfixExpr[X,String,Boolean](this, v, "LIKE")
   def notLike (v: SqlLiteralExpr[String])(implicit ev: X =:= String) = SqlInfixExpr[X,String,Boolean](this, v, "NOT LIKE")
   
-  def + (v: SqlLiteralExpr[Int])(implicit ev: X =:= Int) = SqlInfixExpr[X,Int,Int](this, v, "+")
-  def - (v: SqlLiteralExpr[Int])(implicit ev: X =:= Int) = SqlInfixExpr[X,Int,Int](this, v, "-")
+  // TODO: decimals
+  def + [T](v: SqlLiteralExpr[T])(implicit ev: X => Long, ev2: T => Long) = SqlInfixExpr[X,T,Long](this, v, "+")
+  def - [T](v: SqlLiteralExpr[T])(implicit ev: X => Long, ev2: T => Long) = SqlInfixExpr[X,T,Long](this, v, "-")
   
   // TODO: make this work
   //def as (alias: String) = new query.SelectExprS(this.sql)
 }
 
-case class SqlRawExpr [X] (sql: String, params: List[SqlSingleParam[_,_]] = Nil) extends SqlExpr[X]
+case class SqlRawExpr [X] (sql: String, params: Seq[SqlParam[_]] = Nil) extends SqlExpr[X]
 
 abstract class SqlTable [T <: SqlTable[T]](_companion: TableCompanion[T], tableName: String = null, schema: String = null) {self: T =>
   val _tableName = Option(tableName) getOrElse _companion.getClass.getCanonicalName.split('.').last.split('$').last
