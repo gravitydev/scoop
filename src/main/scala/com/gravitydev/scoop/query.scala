@@ -69,8 +69,8 @@ object `package` {
       util.using (statement.executeQuery()) {results => 
         util.bmap(results.next) { 
           process(results) match {
-            case Success(v) => v
-            case Failure(e) => error("Scoop Parse Error: " + e)
+            case ParseSuccess(v) => v
+            case ParseFailure(e) => error("Scoop Parse Error: " + e)
           }
         }
       }
