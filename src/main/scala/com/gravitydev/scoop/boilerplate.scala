@@ -42,6 +42,7 @@ abstract class ParserBase [+A] (fn: ResultSet => ParseResult[A]) extends P[A] {
   def apply (rs: ResultSet) = fn(rs)
   def columns: List[query.SelectExprS]
   def >> [T](fn: A=>T) = new Parser1(this map fn)
+  override def toString = "ParserBase(" + util.fnToString(fn) + ")"
 }
 
 class CompoundParser [+A,+X](parser: ParserX[X], mapped: P[A]) extends P[A] {
@@ -49,11 +50,13 @@ class CompoundParser [+A,+X](parser: ParserX[X], mapped: P[A]) extends P[A] {
   def apply (rs: ResultSet) = mapped(rs)
   def ~ [X](px: P[X]) = new Parser2(this, px)
   def >> [T](fn: A=>T) = new Parser1(this map fn)
+  override def toString = "("+parser+" >> T)"
 }
 
 abstract class ParserX [+T] extends ResultSetParser [T] {
   def list: List[ResultSetParser[_]]
   def columns = list.foldLeft(List[query.SelectExprS]())((l,p) => l ++ p.columns)
+  override def toString = list.map(_.toString).mkString(" ~ ")
 }
 
 class Parser1 [+A](pa: P[A]) extends ParserX[A] {
@@ -67,7 +70,7 @@ class Parser2 [+A,B](pa: P[A], pb: P[B]) extends ParserX[(A,B)] {
   def list = List(pa,pb)
   def >> [T](fn: (A,B)=>T) = new CompoundParser(this, for (a <- pa; b <- pb) yield fn(a,b))
   def ~ [X](px: P[X]) = new Parser3(pa,pb,px)
-  def apply (rs: ResultSet) = >>(tuple2)(rs)
+  def apply (rs: ResultSet) = >>(tuple2).apply(rs)
 }
 
 class Parser3 [+A,B,C](pa: P[A], pb: P[B], pc: P[C]) extends ParserX[(A,B,C)] {

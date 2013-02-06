@@ -68,8 +68,8 @@ object `package` {
       util.using (statement.executeQuery()) {results => 
         util.bmap(results.next) { 
           process(results) match {
-            case Success(v) => v
-            case Failure(e) => error("Scoop Parse Error: " + e)
+            case ParseSuccess(v) => v
+            case ParseFailure(e) => sys.error("Scoop Parse Error: " + e)
           }
         }
       }
@@ -112,6 +112,10 @@ case class Join (table: String, predicate: String, params: Seq[SqlParam[_]]) {
 class InsertBuilder (into: String) {
   def set (assignments: AssignmentS*) = Insert (into, assignments.map(_.sql).toList, assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params})
   def values (assignments: SqlAssignment[_]*) = Insert2(into, assignments.toList)
+  def apply (columns: SqlCol[_]*) = new InsertBuilder2(into, columns)
+}
+class InsertBuilder2 (into: String, columns: Seq[SqlCol[_]]) {
+  def values (sql: SqlS) = Insert3(into, columns, sql)
 }
 
 class UpdateBuilder (tb: UpdateQueryableS) {
@@ -163,6 +167,18 @@ case class Insert2 (
   def comment (c: String): Insert2 = copy(comment = Some(c))
   def params = assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params}
   def sql = "INSERT INTO " + into + " (" + assignments.map(_.col.name).mkString(", ") + ") VALUES (" + assignments.map(_.valueSql).mkString(", ") + ")"
+}
+
+// using a subselect
+case class Insert3 (
+  into: String,
+  columns: Seq[SqlCol[_]],
+  query: SqlS,
+  comment: Option[String] = None
+) extends InsertBase {
+  def comment (c: String): Insert3 = copy(comment = Some(c))
+  def params = query.params 
+  def sql = "INSERT INTO " + into + " (" + columns.map(_.name).mkString(", ") + ")\n" + query.sql
 }
 
 case class Update (

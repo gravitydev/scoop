@@ -30,6 +30,12 @@ class ScoopSpec extends FlatSpec {
   }
   
   "Query API" should "work" in {
+    using (tables.users) {u =>
+      val insertQ = insertInto(u)(u.id, u.first_name).values(from(u).where(u.id === 24L).select(u.id, u.last_name))
+      println(insertQ.sql)
+      println(insertQ.params)
+    }
+    
     val xx = decimal("SOMETHING", "SOMETHING2").columns
 
     val ids = using (tables.users as "u", tables.issues as "i") {(u,i) =>
@@ -38,12 +44,8 @@ class ScoopSpec extends FlatSpec {
         .limit(10)
         .find(i.id)
     }
-    println("*"*50)
-    println(ids)
 
     val res = using (tables.users as "hello") {u =>
-      println("ALIAS")
-      println(u.id as "somethingelse")
       val q = from(u)
         .where(u.email === "")
         .limit(10)
@@ -56,9 +58,6 @@ class ScoopSpec extends FlatSpec {
     val nums = List(IssueStatuses.Open, IssueStatuses.Closed)
     val mapped = nums.map(v => i.status === v and i.status === v and i.status === v)
     val folded = mapped.foldLeft(false : ast.SqlExpr[Boolean])(_ or _)
-
-    println(mapped)
-    println(folded)
 
     {
       val x = "(" +~ from(u).where(u.id === 24) +~ ") UNION (" +~ from(i).where(i.id === 13) +~ ")"
@@ -74,6 +73,9 @@ class ScoopSpec extends FlatSpec {
  
     val issueParser = i.id ~ i.status ~ userP ~ opt(userP) >> Issue.apply
 
+    println(issueParser.getClass)
+    println(issueParser)
+
     issueParser.columns map println
 
     val xparser = i.id ~ userP ~ long("test", sql="(SELECT 1)")
@@ -82,7 +84,7 @@ class ScoopSpec extends FlatSpec {
 
     val qq = from(i) select(testParser.columns:_*) 
     
-    val num = "SELECT 1 as num FROM users WHERE 1 = ?" %? 1 //map int("num") head;
+    val num = "SELECT 1 as num FROM users WHERE 1 = ?" %? 1 map int("num") head;
 
     val n = i.id |=| intToSqlLongLit(24)
  
@@ -124,14 +126,12 @@ class ScoopSpec extends FlatSpec {
 
     val vx = from(i)
       .select( (int("test", sql="1") >> {x => x}).columns:_* )
-
-    println(vx.sql)
     
   }
 
   "utils" should "work" in {
     util.processQuery("SELECT 1 as first, 2 as second, 'something' as ha") {rs =>
-      println(util.inspectRS(rs))
+      //println(util.inspectRS(rs))
     }
   }
 }

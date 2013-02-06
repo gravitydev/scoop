@@ -52,5 +52,25 @@ object `package` {
     
     getColumns(count) mkString("ResultSet:\n", "\n", "\n")
   }
+
+  def classToString (c: Class[_]) = c.getName.stripPrefix("java.lang.")
+
+  def fnToString [P,T] (fn: _ => _) = {
+    // figure out the main 'apply' method to reflect
+    val cls = fn.getClass
+    val applyMethods = cls.getMethods.filter(_.getName == "apply")
+
+    val nonAnyRefMethods = applyMethods.filter(_.getParameterTypes.head != classOf[AnyRef])
+
+    val method = nonAnyRefMethods.headOption map {me =>
+      cls.getMethod("apply", me.getParameterTypes.head)
+    } getOrElse {
+      cls.getMethod("apply", applyMethods.head.getParameterTypes.head)
+    }
+    
+    val paramTypes = method.getParameterTypes
+
+    classToString(paramTypes.head) + " => " + classToString(method.getReturnType)
+  }
 }
 

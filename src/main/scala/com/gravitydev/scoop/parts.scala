@@ -69,3 +69,4 @@ class QueryS (s: String, params: Seq[SqlParam[_]]) extends SqlFragmentS(s, param
   def map [B](process: ResultSet => ParseResult[B])(implicit c: Connection): List[B] = executeQuery(this)(process)
   //def +~ (s: SqlS) = new QueryS(sql + s.sql, params ++ s.params)
 }
+

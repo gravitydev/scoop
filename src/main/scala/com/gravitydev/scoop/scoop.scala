@@ -9,8 +9,8 @@ object `package` {
 
   def opt [T](p: ResultSetParser[T]): boilerplate.ParserBase[Option[T]] = {
     new boilerplate.ParserBase [Option[T]] (rs => p(rs) match {
-      case Success(s) => Success(Option(s))
-      case Failure(e) => Success(None)
+      case ParseSuccess(s) => ParseSuccess(Option(s))
+      case ParseFailure(e) => ParseSuccess(None)
     }) {
       def columns = p.columns
     }
@@ -34,24 +34,24 @@ object `package` {
 
 private [scoop] sealed trait ParseResult[+T] {
   def map [X](fn: T => X): ParseResult[X] = this match {
-    case Success(v) => Success(fn(v))
-    case Failure(e) => Failure(e)
+    case ParseSuccess(v) => ParseSuccess(fn(v))
+    case ParseFailure(e) => ParseFailure(e)
   }
   def flatMap [X](fn: T => ParseResult[X]): ParseResult[X] = fold (
-    e => Failure(e),
+    e => ParseFailure(e),
     v => fn(v)
   )
   def fold [X](lf: String => X, rf: T => X) = this match {
-    case Failure(e) => lf(e)
-    case Success(v) => rf(v)
+    case ParseFailure(e) => lf(e)
+    case ParseSuccess(v) => rf(v)
   }
   def get = fold (
-    e => error(e),
+    e => sys.error(e),
     v => v
   )
 }
-private [scoop] case class Success [T] (v: T) extends ParseResult[T]
-private [scoop] case class Failure (error: String) extends ParseResult[Nothing]
+private [scoop] case class ParseSuccess [T] (v: T) extends ParseResult[T]
+private [scoop] case class ParseFailure (error: String) extends ParseResult[Nothing]
 
 trait SqlType [T] {self =>
   def tpe: Int // jdbc sql type
@@ -83,51 +83,55 @@ case class SqlSingleParam [T,S] (v: T)(implicit val tp: SqlType[T]) extends SqlP
 }
 case class SqlSetParam [T](v: Set[T])(implicit tp: SqlType[T]) extends SqlParam[Set[T]] {
   def toList = v.toList.map(x => SqlSingleParam(x))
-  def apply (stmt: PreparedStatement, idx: Int) = error("WTF!")
+  def apply (stmt: PreparedStatement, idx: Int) = sys.error("WTF!")
 }
 
 trait ResultSetParser[+T] extends (ResultSet => ParseResult[T]) {self =>
   def map [X] (fn: T => X): ResultSetParser[X] = new ResultSetParser [X] {
     def apply (rs: ResultSet) = self(rs) map fn
     def columns = self.columns
+    override def toString = "ResultSetParser(fn=" + util.fnToString(fn) + ")"
   }
   /* WARNING: resulting parser won't accumulate columns */
   def flatMap [X] (fn: T => ResultSetParser[X]): ResultSetParser[X] = new ResultSetParser [X] {
     def apply (rs: ResultSet) = for (x <- self(rs); y <- fn(x)(rs)) yield y
     def columns = self.columns 
+    override def toString = "ResultSetParser(fn=" + util.fnToString(fn) + ")"
   }
   def columns: List[query.SelectExprS]
 }
 
 case class literal [T] (value: T) extends ResultSetParser [T] {
   def columns = Nil
-  def apply (rs: ResultSet) = Success(value)
+  def apply (rs: ResultSet) = ParseSuccess(value)
 }
 
 class ExprParser [+T] (name: String, exp: SqlType[T], sql: String = "") 
-    extends boilerplate.ParserBase[T] (rs => exp.parse(rs, name) map {Success(_)} getOrElse Failure("Could not parse expression: " + name + " [" + exp + "] from " + util.inspectRS(rs))) {
+    extends boilerplate.ParserBase[T] (rs => exp.parse(rs, name) map {ParseSuccess(_)} getOrElse ParseFailure("Could not parse expression: " + name + " [" + exp + "] from " + util.inspectRS(rs))) {
   def prefix (pf: String) = new ExprParser (pf+name, exp)
   def columns = List(sql) filter (_!="") map (x => x+" as "+name: query.SelectExprS)
 }
 
 class ColumnParser[T](column: ast.SqlNonNullableCol[T]) 
     extends boilerplate.ParserBase[T] (rs => 
-      column parse rs map {Success(_)} getOrElse {
-        Failure("Could not parse column [" + column._alias + "] from " + util.inspectRS(rs))
+      column parse rs map {ParseSuccess(_)} getOrElse {
+        ParseFailure("Could not parse column [" + column._alias + "] from " + util.inspectRS(rs))
       }
     ) {
   def name = column.name
   def columns = List(column.selectSql)
+  override def toString = "ColumnParser(column=" + column + ")"
 }
 
 class NullableColumnParser[T](column: ast.SqlNullableCol[T]) 
     extends boilerplate.ParserBase[Option[T]] (rs => 
-      column parse rs map {Success(_)} getOrElse {
-        Failure("Could not parse [" + column.name + "] (optional) from " + util.inspectRS(rs)) 
+      column parse rs map {ParseSuccess(_)} getOrElse {
+        ParseFailure("Could not parse [" + column.name + "] (optional) from " + util.inspectRS(rs)) 
       }
     ) {
   def name = column.name
   def columns = List(column.selectSql)
+  override def toString = "NullableColumnParser(column=" + column + ")"
 }
 
 abstract class SqlOrder (val sql: String)
