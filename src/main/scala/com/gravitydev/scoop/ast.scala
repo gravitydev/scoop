@@ -51,7 +51,9 @@ sealed trait SqlExpr [X] extends Sql {
 case class SqlRawExpr [X] (sql: String, params: Seq[SqlParam[_]] = Nil) extends SqlExpr[X]
 
 abstract class SqlTable [T <: SqlTable[T]](_companion: TableCompanion[T], tableName: String = null, schema: String = null) {self: T =>
-  val _tableName = Option(tableName) getOrElse _companion.getClass.getCanonicalName.split('.').last.split('$').last
+  // hmm... this is a bit brittle, but it *is* convenient
+  val _tableName = Option(tableName) getOrElse _companion.getClass.getName.split('.').last.split('$').last
+
   val _schema = Option(schema)
   
   // Mutable for convenience
@@ -62,8 +64,7 @@ abstract class SqlTable [T <: SqlTable[T]](_companion: TableCompanion[T], tableN
   def _prefix = _alias + "_" 
 
   implicit def _self = this
-  def col[T](name: String, cast: String = null)(implicit st: SqlType[T]) = new SqlNonNullableCol[T](name, Option(cast), this, st)
-  def col[T](name: Symbol)(implicit st: SqlType[T]) = new SqlNonNullableCol[T](name.name, None, this, st)
+  def col[T](name: Symbol, cast: String = null)(implicit st: SqlType[T]) = new SqlNonNullableCol[T](name.name, Option(cast), this, st)
   
   def as (alias: String): T = {
     val t = _companion.apply

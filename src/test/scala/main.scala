@@ -31,9 +31,11 @@ class ScoopSpec extends FlatSpec {
   
   "Query API" should "work" in {
     using (tables.users) {u =>
+      from(u).where(u.data.isNotNull).find(u.data)
+    }
+
+    using (tables.users) {u =>
       val insertQ = insertInto(u)(u.id, u.first_name).values(from(u).where(u.id === 24L).select(u.id, u.last_name))
-      println(insertQ.sql)
-      println(insertQ.params)
     }
     
     val xx = decimal("SOMETHING", "SOMETHING2").columns
@@ -73,9 +75,6 @@ class ScoopSpec extends FlatSpec {
  
     val issueParser = i.id ~ i.status ~ userP ~ opt(userP) >> Issue.apply
 
-    println(issueParser.getClass)
-    println(issueParser)
-
     issueParser.columns map println
 
     val xparser = i.id ~ userP ~ long("test", sql="(SELECT 1)")
@@ -114,7 +113,6 @@ class ScoopSpec extends FlatSpec {
 
     val assignee: Option[Long] = Option(1L)
   
-    /*
     val y = update(i)
       .set(
         i.id          := 4L,
@@ -122,7 +120,6 @@ class ScoopSpec extends FlatSpec {
       )
       .where(i.item_id === 24)
 
-    */
 
     val vx = from(i)
       .select( (int("test", sql="1") >> {x => x}).columns:_* )

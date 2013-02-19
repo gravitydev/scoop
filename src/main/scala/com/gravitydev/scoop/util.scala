@@ -56,6 +56,7 @@ object `package` {
   def classToString (c: Class[_]) = c.getName.stripPrefix("java.lang.")
 
   def fnToString [P,T] (fn: _ => _) = {
+    /* 
     // figure out the main 'apply' method to reflect
     val cls = fn.getClass
     val applyMethods = cls.getMethods.filter(_.getName == "apply")
@@ -71,6 +72,7 @@ object `package` {
     val paramTypes = method.getParameterTypes
 
     classToString(paramTypes.head) + " => " + classToString(method.getReturnType)
+    */ "Function"
   }
 }
 

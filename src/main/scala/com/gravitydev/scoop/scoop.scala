@@ -24,6 +24,7 @@ object `package` {
   implicit object date       extends SqlNativeType [Date]         (Types.DATE,      _ getDate _,      _ setDate (_,_))
   implicit object boolean    extends SqlNativeType [Boolean]      (Types.BOOLEAN,   _ getBoolean _,   _ setBoolean (_,_))
   implicit object decimal    extends SqlNativeType [scala.math.BigDecimal] (Types.DECIMAL, (rs, idx) => scala.math.BigDecimal(rs.getBigDecimal(idx)), (rs, idx, value) => rs.setBigDecimal(idx, value.underlying))
+  implicit object anyref     extends SqlNativeType [AnyRef]       (Types.JAVA_OBJECT, _ getObject _, _ setObject(_,_))
   
   implicit def toColumnParser [X](c: ast.SqlNonNullableCol[X]) = new ColumnParser(c)
   implicit def toNullableColumnParser [X](c: ast.SqlNullableCol[X]) = new NullableColumnParser(c)
