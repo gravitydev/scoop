@@ -79,15 +79,9 @@ abstract class SqlTable [T <: SqlTable[T]](_companion: TableCompanion[T], tableN
   def updateSql = _tableName
 }
 
-/*
-sealed trait SqlAssignment extends SqlExpr[Unit]
-class SqlLiteralAssignment [T](col: SqlCol[T], value: T)(implicit sqlType: SqlType[T]) extends SqlAssignment {
-  def sql = col.name + " = ?"
-  override def params = List(SqlSingleParam(value))
-}
-*/
 class SqlAssignment [T](val col: SqlCol[T], value: SqlExpr[T]) extends SqlExpr[Unit] {
-  def sql = col.name + " = " + valueSql
+  def sql = col.sql + " = " + valueSql
+  def insertSql = col.name + " = " + valueSql
   def valueSql = value.sql + col.cast.map("::" + _).getOrElse("")
   override def params = value.params
 }

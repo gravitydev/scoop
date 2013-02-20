@@ -110,6 +110,15 @@ class ScoopSpec extends FlatSpec {
       i.status      := IssueStatuses.Open
     )
 
+    println(x.sql)
+
+    val z = insertInto(i).set(
+      i.item_id     := 24,
+      i.project_id  := 27,
+      i.status      := IssueStatuses.Open
+    )
+
+    println(z.sql)
 
     val assignee: Option[Long] = Option(1L)
   
@@ -119,6 +128,8 @@ class ScoopSpec extends FlatSpec {
         i.assigned_to := assignee
       )
       .where(i.item_id === 24)
+
+    println(y.sql)
 
 
     val vx = from(i)
