@@ -80,8 +80,8 @@ abstract class SqlTable [T <: SqlTable[T]](_companion: TableCompanion[T], tableN
 }
 
 class SqlAssignment [T](val col: SqlCol[T], value: SqlExpr[T]) extends SqlExpr[Unit] {
-  def sql = col.sql + " = " + valueSql
-  def insertSql = col.name + " = " + valueSql
+  // assignments should have only the table name, never the alias
+  def sql = col.name + " = " + valueSql
   def valueSql = value.sql + col.cast.map("::" + _).getOrElse("")
   override def params = value.params
 }

@@ -29,7 +29,6 @@ object `package` {
   implicit def predToPredicateS (pred: SqlExpr[Boolean]) = new PredicateS(pred.sql, pred.params)
   implicit def orderingToOrder (o: SqlOrdering)   = new OrderByS(o.sql)
   implicit def assignmentToAssignmentS (a: SqlAssignment[_]) = new AssignmentS(a.sql, a.params)
-  implicit def assignmentToInsertAssignmentS (a: SqlAssignment[_]) = new InsertAssignmentS(a.insertSql, a.params)
   implicit def queryToQueryS (q: Query)           = new QueryS(q.sql, q.params)
   
   implicit def listToExpr (l: List[String]) = l.map(x => x: ExprS)
@@ -43,6 +42,7 @@ object `package` {
 
   def sql [T] (sql: String) = new SqlRawExpr[T](sql, Nil)
   def sql [T] (sql: SqlS) = new SqlRawExpr[T](sql.sql, sql.params)
+  def subquery [T] (q: QueryS) = sql[T]("(" +~ q +~ ")")
 
   // safe aliasing
   private class Aliaser {
@@ -111,7 +111,7 @@ case class Join (table: String, predicate: String, params: Seq[SqlParam[_]]) {
 }
 
 class InsertBuilder (into: String) {
-  def set (assignments: InsertAssignmentS*) = Insert (into, assignments.map(_.sql).toList, assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params})
+  def set (assignments: AssignmentS*) = Insert (into, assignments.map(_.sql).toList, assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params})
   def values (assignments: SqlAssignment[_]*) = Insert2(into, assignments.toList)
   def apply (columns: SqlCol[_]*) = new InsertBuilder2(into, columns)
 }

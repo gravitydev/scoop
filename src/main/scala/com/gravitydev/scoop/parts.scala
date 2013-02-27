@@ -61,7 +61,6 @@ object PredicateS {
 
 class OrderByS   (s: String) extends SqlS(s)
 class AssignmentS (s: String, params: Seq[SqlParam[_]]) extends SqlS(s, params)
-class InsertAssignmentS (s: String, params: Seq[SqlParam[_]]) extends SqlS(s, params)
 
 /**
  * A query as a string, ready to be executed 

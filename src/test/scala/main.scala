@@ -69,7 +69,7 @@ class ScoopSpec extends FlatSpec {
       val q = from(u).where("u.id IN (" +~ from(u).where(u.id === 2) +~ ")")
     }    
 
-
+  
     
     val userP = Parsers.user(u)
  
@@ -82,6 +82,9 @@ class ScoopSpec extends FlatSpec {
     val testParser = i.id ~ xparser
 
     val qq = from(i) select(testParser.columns:_*) 
+
+    val qx = from(i).where(i.id |=| subquery[Long](qq))
+    println(qx)
     
     val num = "SELECT 1 as num FROM users WHERE 1 = ?" %? 1 map int("num") head;
 
