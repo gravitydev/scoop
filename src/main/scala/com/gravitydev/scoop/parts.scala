@@ -39,9 +39,8 @@ object ExprS {
 class SelectExprS     (s: String, params: Seq[SqlParam[_]] = Nil) extends SqlS(s, params)
 object SelectExprS {
   implicit def fromString (s: String)           = new SelectExprS(s)
-  implicit def fromCol (col: ast.SqlCol[_])     = new SelectExprS(col.selectSql)
+  implicit def fromNamed (expr: ast.SqlNamedExpr[_]) = new SelectExprS(expr.sql + " as " + expr.name, expr.params)
   implicit def fromExprS (expr: ExprS)          = new SelectExprS(expr.sql, expr.params)
-  implicit def fromExpr (expr: ast.SqlExpr[_])  = new SelectExprS(expr.sql, expr.params)
 }
 
 class FromS           (s: String) extends SqlS(s) 

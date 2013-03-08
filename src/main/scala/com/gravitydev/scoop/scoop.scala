@@ -23,11 +23,20 @@ object `package` {
   implicit object timestamp  extends SqlNativeType [Timestamp]    (Types.TIMESTAMP, _ getTimestamp _, _ setTimestamp (_,_))
   implicit object date       extends SqlNativeType [Date]         (Types.DATE,      _ getDate _,      _ setDate (_,_))
   implicit object boolean    extends SqlNativeType [Boolean]      (Types.BOOLEAN,   _ getBoolean _,   _ setBoolean (_,_))
-  implicit object decimal    extends SqlNativeType [scala.math.BigDecimal] (Types.DECIMAL, (rs, idx) => scala.math.BigDecimal(rs.getBigDecimal(idx)), (rs, idx, value) => rs.setBigDecimal(idx, value.underlying))
+  implicit object decimal    extends SqlNativeType [BigDecimal]   (Types.DECIMAL, (rs, idx) => BigDecimal(rs.getBigDecimal(idx)), (rs, idx, value) => rs.setBigDecimal(idx, value.underlying))
   implicit object anyref     extends SqlNativeType [AnyRef]       (Types.JAVA_OBJECT, _ getObject _, _ setObject(_,_))
   
-  implicit def toColumnParser [X](c: ast.SqlNonNullableCol[X]) = new ColumnParser(c)
-  implicit def toNullableColumnParser [X](c: ast.SqlNullableCol[X]) = new NullableColumnParser(c)
+  // TODO: clean up these hacks
+  implicit object voidT      extends SqlNativeType [Unit]         (-1, (_,_) => sys.error("internal2"), (_,_,_) => sys.error("internal3"))
+  implicit def setT[X:SqlType] = new SqlNativeType [Set[X]]       (-1, sys.error("internal"), sys.error("internal")) {}
+  
+  /*
+  implicit def toColumnParser [X:SqlType](c: ast.SqlNonNullableCol[X]) = new ExprParser(c.name, implicitly[SqlType[X]], List(c.sql))
+  implicit def toNullableColumnParser [X:SqlType](c: ast.SqlNullableCol[X]) = new OptionalExprParser(c.name, implicitly[SqlType[X]], List(c.sql)) 
+  */
+  implicit def toParser [X:SqlType] (c: ast.SqlNamedReqExpr[X]) = new ExprParser(c.name, implicitly[SqlType[X]], List(c.sql))
+  implicit def toOptParser [X:SqlType] (c: ast.SqlNamedOptExpr[X]) = new OptionalExprParser(c.name, implicitly[SqlType[X]], List(c.sql))
+  
   implicit def toColumnWrapper [X](c: ast.SqlCol[X]) = ColumnWrapper(c)
   
   private[scoop] def renderParams (params: Seq[SqlParam[_]]) = params.map(x => x.v + ":"+x.v.asInstanceOf[AnyRef].getClass.getName.stripPrefix("java.lang."))
@@ -54,11 +63,21 @@ private [scoop] sealed trait ParseResult[+T] {
 private [scoop] case class ParseSuccess [T] (v: T) extends ParseResult[T]
 private [scoop] case class ParseFailure (error: String) extends ParseResult[Nothing]
 
+class ExprParser [+T] (name: String, exp: SqlType[T], sql: List[String]) // sql should probably be Option
+    extends boilerplate.ParserBase[T] (rs => exp.parse(rs, name) map {ParseSuccess(_)} getOrElse ParseFailure("Could not parse expression: " + name + " [" + exp + "] from " + util.inspectRS(rs))) {
+  def columns = sql map (x => x+" as "+name: query.SelectExprS)
+}
+
+class OptionalExprParser [+T] (name: String, exp: SqlType[T], sql: List[String]) 
+    extends boilerplate.ParserBase[Option[T]] (rs => Some(exp.parse(rs, name)) map {ParseSuccess(_)} getOrElse ParseFailure("Could not parse expression: " + name + " [" + exp + "] from " + util.inspectRS(rs))) {
+  def columns = sql map (x => x+" as "+name: query.SelectExprS)
+}
+
 trait SqlType [T] {self =>
   def tpe: Int // jdbc sql type
   def set (stmt: PreparedStatement, idx: Int, value: T): Unit
   def parse (rs: ResultSet, name: String): Option[T]
-  def apply (n: String, sql: String = "") = new ExprParser (n, this, sql)
+  def apply (n: String, sql: String = "") = new ExprParser (n, this, List(sql))
 }
   
 abstract class SqlNativeType[T] (val tpe: Int, get: (ResultSet, String) => T, _set: (PreparedStatement, Int, T) => Unit) extends SqlType [T] with Logging {
@@ -105,34 +124,6 @@ trait ResultSetParser[+T] extends (ResultSet => ParseResult[T]) {self =>
 case class literal [T] (value: T) extends ResultSetParser [T] {
   def columns = Nil
   def apply (rs: ResultSet) = ParseSuccess(value)
-}
-
-class ExprParser [+T] (name: String, exp: SqlType[T], sql: String = "") 
-    extends boilerplate.ParserBase[T] (rs => exp.parse(rs, name) map {ParseSuccess(_)} getOrElse ParseFailure("Could not parse expression: " + name + " [" + exp + "] from " + util.inspectRS(rs))) {
-  def prefix (pf: String) = new ExprParser (pf+name, exp)
-  def columns = List(sql) filter (_!="") map (x => x+" as "+name: query.SelectExprS)
-}
-
-class ColumnParser[T](column: ast.SqlNonNullableCol[T]) 
-    extends boilerplate.ParserBase[T] (rs => 
-      column parse rs map {ParseSuccess(_)} getOrElse {
-        ParseFailure("Could not parse column [" + column._alias + "] from " + util.inspectRS(rs))
-      }
-    ) {
-  def name = column.name
-  def columns = List(column.selectSql)
-  override def toString = "ColumnParser(column=" + column + ")"
-}
-
-class NullableColumnParser[T](column: ast.SqlNullableCol[T]) 
-    extends boilerplate.ParserBase[Option[T]] (rs => 
-      column parse rs map {ParseSuccess(_)} getOrElse {
-        ParseFailure("Could not parse [" + column.name + "] (optional) from " + util.inspectRS(rs)) 
-      }
-    ) {
-  def name = column.name
-  def columns = List(column.selectSql)
-  override def toString = "NullableColumnParser(column=" + column + ")"
 }
 
 abstract class SqlOrder (val sql: String)

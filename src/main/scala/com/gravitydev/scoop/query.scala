@@ -8,7 +8,7 @@ import collection._, ast._
 object `package` {
   type Predicate = ast.SqlExpr[Boolean]
   
-  implicit def stringToFragment (s: String) = new SqlFragmentS(s)
+  implicit def stringToFragment (s: String) = new SqlFragmentS(s, Seq())
   implicit def fromExpr (expr: ast.SqlExpr[_]) = new ExprS(expr.sql, expr.params)
   
   implicit def tableToWrapped [T <: SqlTable[_]] (t: T) = new TableWrapper(t)
@@ -34,15 +34,21 @@ object `package` {
   implicit def listToExpr (l: List[String]) = l.map(x => x: ExprS)
   implicit def companionToTable [T <: ast.SqlTable[T]] (companion: {def apply (): T}): T = companion()
 
+  // query util
+
+  def exists [T:SqlType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "EXISTS", postfix=false)
+  def notExists [T:SqlType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "NOT EXISTS", postfix=false)
+  
+
   // starting point
   def from (table: FromS) = Query(table.sql)
   def insertInto (table: SqlTable[_]) = new InsertBuilder(table._tableName)
   def update (table: UpdateQueryableS) = new UpdateBuilder(table)
   def deleteFrom (table: UpdateQueryableS) = new DeleteBuilder(table)
 
-  def sql [T] (sql: String) = new SqlRawExpr[T](sql, Nil)
-  def sql [T] (sql: SqlS) = new SqlRawExpr[T](sql.sql, sql.params)
-  def subquery [T] (q: QueryS) = sql[T]("(" +~ q +~ ")")
+  def sql [T:SqlType] (sql: String): SqlRawExpr[T] = new SqlRawExpr[T](sql, Nil)
+  def sql [T:SqlType] (sql: SqlS): SqlRawExpr[T] = new SqlRawExpr[T](sql.sql, sql.params)
+  def subquery [T:SqlType] (q: QueryS) = sql[T]("(" +~ q +~ ")")
 
   // safe aliasing
   private class Aliaser {
@@ -107,7 +113,7 @@ class TableWrapper [T <: SqlTable[_]](t: T) {
 }
 
 case class Join (table: String, predicate: String, params: Seq[SqlParam[_]]) {
-  def sql = table + " ON " + predicate
+  def sql: String = table + " ON " + predicate
 }
 
 class InsertBuilder (into: String) {
@@ -156,7 +162,7 @@ case class Insert (
   comment: Option[String] = None
 ) extends InsertBase {
   def comment (c: String): Insert = copy(comment = Some(c))
-  def sql = "INSERT INTO " + into + " SET " + assignments.mkString(", ")
+  def sql: String = "INSERT INTO " + into + " SET " + assignments.mkString(", ")
 }
 
 // alternate syntax
@@ -166,8 +172,8 @@ case class Insert2 (
   comment: Option[String] = None
 ) extends InsertBase {
   def comment (c: String): Insert2 = copy(comment = Some(c))
-  def params = assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params}
-  def sql = "INSERT INTO " + into + " (" + assignments.map(_.col.name).mkString(", ") + ") VALUES (" + assignments.map(_.valueSql).mkString(", ") + ")"
+  def params: Seq[SqlParam[_]] = assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params}
+  def sql: String = "INSERT INTO " + into + " (" + assignments.map(_.col.columnName).mkString(", ") + ") VALUES (" + assignments.map(_.valueSql).mkString(", ") + ")"
 }
 
 // using a subselect
@@ -178,8 +184,8 @@ case class Insert3 (
   comment: Option[String] = None
 ) extends InsertBase {
   def comment (c: String): Insert3 = copy(comment = Some(c))
-  def params = query.params 
-  def sql = "INSERT INTO " + into + " (" + columns.map(_.name).mkString(", ") + ")\n" + query.sql
+  def params: Seq[SqlParam[_]] = query.params 
+  def sql: String = "INSERT INTO " + into + " (" + columns.map(_.columnName).mkString(", ") + ")\n" + query.sql
 }
 
 case class Update (
@@ -190,7 +196,7 @@ case class Update (
   comment: Option[String] = None
 ) {
   def where (pred: PredicateS) = copy(predicate = predicate.map(_ + " AND " + pred.sql).orElse(Some(pred.sql)), params = this.params ++ pred.params)
-  def sql = comment.map("/* " + _ + "*/\n").getOrElse("") + "UPDATE " + table + " SET " + assignments.mkString(", ") + predicate.map(w => " \nWHERE " + w + "\n").getOrElse("")
+  def sql: String = comment.map("/* " + _ + "*/\n").getOrElse("") + "UPDATE " + table + " SET " + assignments.mkString(", ") + predicate.map(w => " \nWHERE " + w + "\n").getOrElse("")
 
   def apply ()(implicit c: Connection) = try util.using(c.prepareStatement(sql)) {stmt => 
     for ((p, idx) <- params.zipWithIndex) p(stmt, idx+1)
@@ -209,7 +215,7 @@ case class Delete (
   comment: Option[String] = None
 ) {
   def where (pred: PredicateS) = copy(predicate = predicate + " AND " + pred.sql, params = this.params ++ pred.params)
-  def sql = comment.map("/* " + _ + "*/\n").getOrElse("") + "DELETE FROM " + table + "\nWHERE " + predicate + "\n"
+  def sql: String = comment.map("/* " + _ + "*/\n").getOrElse("") + "DELETE FROM " + table + "\nWHERE " + predicate + "\n"
   def apply ()(implicit c: Connection) = {
     util.using(c.prepareStatement(sql)) {stmt => 
       for ((p, idx) <- params.zipWithIndex) p(stmt, idx+1)
@@ -233,7 +239,11 @@ case class Query (
   distinct:   Boolean         = false,
   forUpdateLock:  Boolean         = false
 ) {
-  def select (cols: SelectExprS*)   = copy(sel = cols.map(_.sql).toList, selectParams = cols.map(_.params).flatten)
+
+  // single expr, useful to have it typed
+  def select [T:SqlType](expr: SqlNamedExpr[T]): ast.SqlQueryExpr[T] = ast.SqlQueryExpr[T](select(expr: SelectExprS))
+
+  def select (cols: SelectExprS*): Query = copy(sel = cols.map(_.sql).toList, selectParams = cols.map(_.params).flatten)
   def forUpdate ()            = copy(forUpdateLock = true)
   def selectDistinct (cols: SelectExprS*) = copy(sel = cols.map(_.sql).toList, distinct=true)
   def addCols (cols: ExprS*)  = copy(sel = sel ++ cols.map(_.sql).toList)
@@ -249,9 +259,9 @@ case class Query (
   def offset (o: Int): Query = copy(offset = Some(o))
   def comment (c: String): Query = copy(comment = Some(c))
   
-  def params = selectParams ++ queryParams
+  def params: Seq[SqlParam[_]] = selectParams ++ queryParams
   
-  def sql = 
+  def sql: String = 
     comment.map(c => "/* " + c + "*/ \n").getOrElse("") +
     "SELECT " + (if (distinct) "DISTINCT " else "") + sel.mkString(", \n") + " \n" + 
     "FROM " + from + "\n" +
@@ -275,9 +285,10 @@ case class Query (
   def union (q: QueryS) = (sql + "\n UNION \n" + q.sql) onParams (params ++ q.params :_*)
   
   // useful for subqueries
-  def as (alias: String) = "(" +~ queryToQueryS(this) +~ ") as " +~ alias
+  //def as (alias: String) = "(" +~ queryToQueryS(this) +~ ") as " +~ alias
 }
 
 case class OrderBy (order: String, dir: String = null) {
   def sql = order + Option(dir).map(" "+_).getOrElse("")
 }
+

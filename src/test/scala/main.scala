@@ -14,12 +14,12 @@ class ScoopSpec extends FlatSpec {
   "Basic Functions" should "work" in {
     // addition
     {
-      val x: SelectExprS = (1: ast.SqlExpr[Int]) + 2
-      x should matchSql("(? + ?)", 1, 2)
+      val x: SelectExprS = ((1 : ast.SqlExpr[Int]) + 2) as "a"
+      x should matchSql("(? + ?) as a", 1, 2)
     }
     {
-      val x: SelectExprS = (1: ast.SqlExpr[Int]) - 2
-      x should matchSql("(? - ?)", 1, 2)
+      val x: SelectExprS = ((1: ast.SqlExpr[Int]) - 2) as "b"
+      x should matchSql("(? - ?) as b", 1, 2)
     }
   }
   
@@ -29,10 +29,49 @@ class ScoopSpec extends FlatSpec {
     }
   }
   
-  "Query API" should "work" in {
+  "IS NOT NULL" should "work" in {
     using (tables.users) {u =>
       from(u).where(u.data.isNotNull).find(u.data)
     }
+  }
+
+  "Subquery expression" should "work" in {
+    using (tables.users) {u => 
+      val q = from(u)
+        .where(
+          exists(from(u).select(u.id)) &&
+          u.id === from(u).limit(1).select(u.id)
+        )
+        .select(u.id)
+
+      val q2 = from(u).find(from(u).select(u.id) as "a")
+
+      /*
+       * INSERT INTO cars (make, model)
+       * SELECT 'ford', 'mustang'
+       * FROM cars
+       * ( WHERE NOT EXISTS
+       *         (SELECT id FROM cars WHERE make = 'ford' AND model = 'mustang')
+       * LIMIT 1;
+       */
+
+      /*
+      using (tables.cars, tables.cars) {(c,inner) =>
+        insertInto(c)(c.make, c.model).values(
+          from(c)
+            .where(
+              notExists( 
+                from(inner).where(inner.make === "ford" && inner.model === "mustang").select(inner.id) 
+              )
+            )
+            .select("'ford', 'mustang'")
+        )
+      }
+      */
+    }
+  }
+  
+  "Query API" should "work" in {
 
     using (tables.users) {u =>
       val insertQ = insertInto(u)(u.id, u.first_name).values(from(u).where(u.id === 24L).select(u.id, u.last_name))
@@ -73,7 +112,7 @@ class ScoopSpec extends FlatSpec {
     
     val userP = Parsers.user(u)
  
-    val issueParser = i.id ~ i.status ~ userP ~ opt(userP) >> Issue.apply
+    val issueParser = i.id ~ i.status ~ userP ~ opt(userP) ~ i.release_id >> Issue.apply
 
     issueParser.columns map println
 

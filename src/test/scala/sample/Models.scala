@@ -18,7 +18,8 @@ object Models {
     id:       Long,
     status:   IssueStatus,
     reporter: User,
-    assignee: Option[User]
+    assignee: Option[User],
+    release_id: Option[Long]
   )
   
 }
