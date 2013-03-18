@@ -28,7 +28,7 @@ object `package` {
   
   // TODO: clean up these hacks
   implicit object voidT      extends SqlNativeType [Unit]         (-1, (_,_) => sys.error("internal2"), (_,_,_) => sys.error("internal3"))
-  implicit def setT[X:SqlType] = new SqlNativeType [Set[X]]       (-1, sys.error("internal"), sys.error("internal")) {}
+  implicit def setT[X:SqlType] = new SqlNativeType [Set[X]]       (-1, (_,_) => sys.error("internal"), (_,_,_) => sys.error("internal")) {}
   
   /*
   implicit def toColumnParser [X:SqlType](c: ast.SqlNonNullableCol[X]) = new ExprParser(c.name, implicitly[SqlType[X]], List(c.sql))
