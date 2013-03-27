@@ -1,0 +1,112 @@
+{#
+    gravitydev/layout.html
+    ~~~~~~~~~~~~~~~~~
+#}
+
+{% extends "basic/layout.html" %}
+{% set script_files = script_files + ['_static/toc.js'] %}
+{% set script_files = script_files + ['_static/prettify.js'] %}
+{% set script_files = script_files + ['_static/highlightCode.js'] %}
+{% set script_files = script_files + ['_static/effects.core.js'] %}
+{% set script_files = script_files + ['_static/effects.highlight.js'] %}
+{% set script_files = script_files + ['_static/scrollTo.js'] %}
+{% set script_files = script_files + ['_static/contentsFix.js'] %}
+{% set script_files = script_files + ['_static/ga.js'] %}
+{% set css_files = css_files + ['_static/prettify.css'] %}
+{% set css_files = css_files + ['_static/base.css'] %}
+{% set css_files = css_files + ['_static/docs.css'] %}
+{% set css_files = css_files + ['_static/gravitydev.css'] %}
+
+{# do not display relbars #}
+{% block relbar1 %}{% endblock %}
+{% block relbar2 %}{% endblock %}
+
+{% block content %}
+  <div class="navbar">
+    <div class="navbar-inner" style='overflow: hidden'>
+      <div class="navbar-logo" style='float: left'>
+        <span class='logo-text'><a href='/'>Scoop</a></span>
+      </div>    
+      <ul class="nav">
+        <li><a href="/default.html">Home</a></li>
+        <li><a href="/index.html">Documentation</a></li>
+        <li><a href="http://www.apache.org/licenses/LICENSE-2.0.html">License</a></li>
+        <li><a href="/about.html">About</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="main">
+    <div class="page-title">{{ title }}</div>
+    <div class="main-container">
+      <div class="container">
+        {%- if next or prev %}
+        <div class="row">
+          <div class="span12">
+            <ul class="breadcrumb">           
+              <li>
+                {%- if next %}
+                 <span class="divider">|</span> <a href="{{ next.link|e }}">{{ next.title }}</a> <span class="divider">»</span>
+                {%- endif %}
+              </li>
+              <li>
+                <a href="{{ pathto(master_doc) }}">{{ _('Contents') }}</a>
+              </li>
+              <li>
+                {%- if prev %}
+                <span class="divider">«</span> <a href="{{ prev.link|e }}">{{ prev.title }}</a> <span class="divider">|</span> 
+                {%- endif %}
+              </li>
+              <li>
+                <!--Version {{ version|e }}-->
+              </li>
+            </ul>
+          </div>
+        </div>
+        {%- endif %}
+        <div class="row">
+          <div class="span9">
+            {% block body %}{% endblock %}
+          </div>
+          <div class="span3">
+            {%- if suppressToc is sameas True -%}
+            {%- else -%}
+              <p class="contents-title">Contents</p>
+              <div id="scroller-anchor">
+                <div id="scroller">
+                  <div id="toc"></div>
+                </div>
+              </div>            
+            {%- endif -%}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>  
+
+  {% block scoopfooter %}
+    <div class="footer">
+      <div class="copyright">
+        <p style="float: left;">
+          © 2012 <a href="http://www.alvarocarrasco.com/">Alvaro Carrasco</a>. <span class="license">Scoop is Open Source and available under the Apache 2 License.</span>
+        </p>
+      </div>
+    </div>
+  {% endblock %}
+  {% block footer %}{% endblock %}
+
+    <script type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-20183396-1']);
+    _gaq.push(['_trackPageview']);
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+    </script>
+<script type="text/javascript">
+  $('#toc').toc();
+</script>
+{% endblock %}
+
+

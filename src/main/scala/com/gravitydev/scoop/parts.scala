@@ -18,7 +18,7 @@ object SqlS {
  */
 sealed class SqlFragmentS (sql: String, params: Seq[SqlParam[_]] = Seq()) extends SqlS(sql,params) {
   def +~ (s: SqlFragmentS) = new SqlFragmentS(sql + s.sql, params ++ s.params)
-  def onParams (p: SqlParam[_]*): PredicateS = new PredicateS(sql, params ++ p.toSeq)
+  def onParams (p: SqlParam[_]*) = new SqlFragmentS(sql, params ++ p.toSeq)
   def %? (p: SqlParam[_]*) = onParams(p:_*)
 }
 object SqlFragmentS {
@@ -39,6 +39,7 @@ object ExprS {
 class SelectExprS     (s: String, params: Seq[SqlParam[_]] = Nil) extends SqlS(s, params)
 object SelectExprS {
   implicit def fromString (s: String)           = new SelectExprS(s)
+  implicit def fromFragment (s: SqlFragmentS) = new SelectExprS(s.sql, s.params)
   implicit def fromNamed (expr: ast.SqlNamedExpr[_]) = new SelectExprS(expr.sql + " as " + expr.name, expr.params)
   implicit def fromExprS (expr: ExprS)          = new SelectExprS(expr.sql, expr.params)
 }

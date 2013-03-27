@@ -20,7 +20,8 @@ object `package` {
   implicit def toJoin (s: String)         = new JoinS(s, Nil)
   implicit def toPredicate (s: String)    = new PredicateS(s, Nil)
   //implicit def toQuery (s: String)        = new QueryS(s, Seq())
-  implicit def predicateToQueryS (p: PredicateS) = new QueryS(p.sql, p.params)
+  //implicit def predicateToQueryS (p: PredicateS) = new QueryS(p.sql, p.params)
+  implicit def fragmentToQueryS (s: SqlFragmentS) = new QueryS(s.sql, s.params)
   implicit def querySToPredicate (p: QueryS) = new PredicateS(p.sql, p.params)
   implicit def toOrder (s: String)        = new OrderByS(s)
   
@@ -41,7 +42,9 @@ object `package` {
   
 
   // starting point
-  def from (table: FromS) = Query(table.sql)
+  def from (table: FromS) = Query(Some(table.sql))
+  def where (pred: PredicateS) = Query(None, predicate = Some(pred.sql), queryParams = pred.params)
+  def select (cols: SelectExprS*): Query = Query(None, sel = cols.map(_.sql).toList, selectParams = cols.map(_.params).flatten)
   def insertInto (table: SqlTable[_]) = new InsertBuilder(table._tableName)
   def update (table: UpdateQueryableS) = new UpdateBuilder(table)
   def deleteFrom (table: UpdateQueryableS) = new DeleteBuilder(table)
@@ -225,7 +228,7 @@ case class Delete (
 }
 
 case class Query (
-  from:       String,
+  from:       Option[String],
   sel:        List[String]    = List("*"),
   joins:      List[String]    = Nil,
   predicate:  Option[String]  = None,
@@ -264,7 +267,7 @@ case class Query (
   def sql: String = 
     comment.map(c => "/* " + c + "*/ \n").getOrElse("") +
     "SELECT " + (if (distinct) "DISTINCT " else "") + sel.mkString(", \n") + " \n" + 
-    "FROM " + from + "\n" +
+    from.map(f => "FROM " + f + "\n").getOrElse("") +
     joins.mkString("", "\n", "\n") + 
     predicate.map(w => "WHERE " + w + "\n").getOrElse("") + 
     (if (group.nonEmpty) group.mkString("GROUP BY ", ", ", "\n") else "") +

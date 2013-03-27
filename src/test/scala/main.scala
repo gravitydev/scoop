@@ -70,8 +70,14 @@ class ScoopSpec extends FlatSpec {
       */
     }
   }
+
+  "Parameterized sql on select" should "work" in {
+    select("?" %? 1)
+  }
   
   "Query API" should "work" in {
+    val s = select("'hello'")
+    println(s)
 
     using (tables.users) {u =>
       val insertQ = insertInto(u)(u.id, u.first_name).values(from(u).where(u.id === 24L).select(u.id, u.last_name))
