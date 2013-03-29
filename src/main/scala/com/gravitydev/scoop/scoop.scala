@@ -1,7 +1,6 @@
 package com.gravitydev.scoop
 
 import java.sql.{ResultSet, PreparedStatement, Types, Timestamp, Date}
-import util.Logging
 
 object `package` {
   type Table[T <: ast.SqlTable[T]] = ast.SqlTable[T]
@@ -30,10 +29,6 @@ object `package` {
   implicit object voidT      extends SqlNativeType [Unit]         (-1, (_,_) => sys.error("internal2"), (_,_,_) => sys.error("internal3"))
   implicit def setT[X:SqlType] = new SqlNativeType [Set[X]]       (-1, (_,_) => sys.error("internal"), (_,_,_) => sys.error("internal")) {}
   
-  /*
-  implicit def toColumnParser [X:SqlType](c: ast.SqlNonNullableCol[X]) = new ExprParser(c.name, implicitly[SqlType[X]], List(c.sql))
-  implicit def toNullableColumnParser [X:SqlType](c: ast.SqlNullableCol[X]) = new OptionalExprParser(c.name, implicitly[SqlType[X]], List(c.sql)) 
-  */
   implicit def toParser [X:SqlType] (c: ast.SqlNamedReqExpr[X]) = new ExprParser(c.name, implicitly[SqlType[X]], List(c.sql))
   implicit def toOptParser [X:SqlType] (c: ast.SqlNamedOptExpr[X]) = new OptionalExprParser(c.name, implicitly[SqlType[X]], List(c.sql))
   
@@ -80,7 +75,7 @@ trait SqlType [T] {self =>
   def apply (n: String, sql: String = "") = new ExprParser (n, this, List(sql))
 }
   
-abstract class SqlNativeType[T] (val tpe: Int, get: (ResultSet, String) => T, _set: (PreparedStatement, Int, T) => Unit) extends SqlType [T] with Logging {
+abstract class SqlNativeType[T] (val tpe: Int, get: (ResultSet, String) => T, _set: (PreparedStatement, Int, T) => Unit) extends SqlType [T] {
   def set (stmt: PreparedStatement, idx: Int, value: T): Unit = {
     if (value==null) stmt.setNull(idx, tpe)
     else _set(stmt, idx, value)

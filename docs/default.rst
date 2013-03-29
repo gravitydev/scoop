@@ -7,9 +7,9 @@ The main motivation is to provide a concise and practical solution that doesn't 
 Lots of inspiration was taken from squeryl, anorm, and the apocalisp blog.
 
 Features:
-* Query DSL that looks very similar to SQL (type-safe to an extent)
-* Composable ResultSet parsing
-* Easy to mix raw SQL when needed
+ * Query DSL that looks very similar to SQL (type-safe to an extent)
+ * Composable ResultSet parsing
+ * Easy to mix raw SQL when needed
 
 Installation
 ------------
@@ -26,11 +26,11 @@ Since the main purpose is to construct queries, the model definition should pret
   import com.gravitydev.scoop._
 
   class users extends Table[users](users) {
-    val id          = col[Long]           ("id")
-    val first_name  = col[String]         ("first_name")
-    val last_name   = col[String]         ("last_name")
-    val age         = col[Int]            ("age")
-    val nickname    = col[String]         ("nickname")    nullable
+    val id          = col[Long]           ('id)
+    val first_name  = col[String]         ('first_name)
+    val last_name   = col[String]         ('last_name)
+    val age         = col[Int]            ('age)
+    val nickname    = col[String]         ('nickname)    nullable
   }
 
 Learn more: :ref:`data-model`
@@ -86,15 +86,18 @@ This is important if your query might be joining the same table twice or is usin
 
   object Parsers {
     // make sure the case class has the correct number and type of parameters
-    def account (a: accounts) = a.id ~ a.name >> Account.apply
+    def account (a: accounts) = 
+      a.id ~ a.name >> Account.apply
 
     // you can use an existing parser when defining a new one:
-    def user (u: users, a: accounts) = u.id ~ u.first_name ~ u.last_name ~ opt(account(a)) >> User.apply
+    def user (u: users, a: accounts) = 
+      u.id ~ u.first_name ~ u.last_name ~ opt(account(a)) >> User.apply
   }
 
   // instantiate a parser by specifying the tables it should use
   // the tables can be configured with aliases
-  // this makes the definition of the parser general, but the instantiation custom to the query
+  // this makes the definition of the parser general, 
+  // but the instantiation specific to the query and the aliases used
   val userParser = Parsers.user( users, accounts )
 
   val query = from(users)

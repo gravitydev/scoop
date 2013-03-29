@@ -26,13 +26,12 @@ Scoop only requires that you give it a java.sql.Connection. It will take one imp
 
   DB withTransaction {implicit conn => 
     // scoop stuff
-    from(users).where(users.id === 1).select(users.first_name) map {u => 
-      // some code
-    }
+    val users = from(users).where(users.id === 1).find(users.id ~ users.last_name)
+    ...
   }
   ...
 
-Keep in mind that you only really need the connection when you execute your query by calling the map method:
+Keep in mind that you only really need the connection when you execute your query by calling the map or find method:
 
 .. code-block:: scala
 

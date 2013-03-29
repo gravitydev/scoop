@@ -5,7 +5,7 @@ jQuery(document).ready(function($) {
     var a = false;
     $("pre").each(function() {      
         if (!$(this).hasClass("prettyprint")) {
-            $(this).addClass("prettyprint lang-scala linenums");
+            $(this).addClass("prettyprint lang-scala");
             a = true
         }
     });
