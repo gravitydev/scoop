@@ -44,7 +44,7 @@ class ScoopSpec extends FlatSpec {
         )
         .select(u.id)
 
-      val q2 = from(u).find(from(u).select(u.id) as "a")
+      val q2 = from(u).find(from(u).limit(1).select(u.id) as "a")
 
       /*
        * INSERT INTO cars (make, model)
@@ -68,6 +68,15 @@ class ScoopSpec extends FlatSpec {
         )
       }
       */
+    }
+  }
+
+  "Ordering on expressions" should "work" in {
+    using(tables.users) {u =>
+      from(u)
+        .where(u.id === 24L)
+        .orderBy(u.id > 24L desc, OrderByS.fromExpr(u.id))
+        .find(u.id)
     }
   }
 

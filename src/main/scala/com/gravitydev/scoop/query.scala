@@ -23,12 +23,12 @@ object `package` {
   //implicit def predicateToQueryS (p: PredicateS) = new QueryS(p.sql, p.params)
   implicit def fragmentToQueryS (s: SqlFragmentS) = new QueryS(s.sql, s.params)
   implicit def querySToPredicate (p: QueryS) = new PredicateS(p.sql, p.params)
-  implicit def toOrder (s: String)        = new OrderByS(s)
+  implicit def toOrder (s: String)        = new OrderByS(s, Nil)
   
   implicit def tableToUpdate(t: SqlTable[_])      = new UpdateQueryableS(t.sql)
   implicit def joinToJoin (j: Join)               = new JoinS(j.sql, j.params)
   implicit def predToPredicateS (pred: SqlExpr[Boolean]) = new PredicateS(pred.sql, pred.params)
-  implicit def orderingToOrder (o: SqlOrdering)   = new OrderByS(o.sql)
+  //implicit def orderingToOrder (o: SqlOrdering)   = new OrderByS(o.sql)
   implicit def assignmentToAssignmentS (a: SqlAssignment[_]) = new AssignmentS(a.sql, a.params)
   implicit def queryToQueryS (q: Query)           = new QueryS(q.sql, q.params)
   
@@ -236,6 +236,7 @@ case class Query (
   group:      List[String]    = Nil,
   selectParams: Seq[SqlParam[_]] = Nil,
   queryParams: Seq[SqlParam[_]] = Nil,
+  orderByParams: Seq[SqlParam[_]] = Nil,
   limit:      Option[Int]     = None,
   offset:     Option[Int]     = None,
   comment:    Option[String]  = None,
@@ -256,13 +257,15 @@ case class Query (
   // always append? we'll go with that for now
   def where (pred: PredicateS) = copy(predicate = predicate.map(_ + " AND " + pred.sql).orElse(Some(pred.sql)), queryParams = this.queryParams ++ pred.params)
 
-  def orderBy (order: OrderByS*) = copy(order = Some( (order.toList.map(_.sql)).mkString(", ")) )
+  def orderBy (order: OrderByS*) = copy(order = Some( (order.toList.map(_.sql)).mkString(", ")), orderByParams =
+    order.foldLeft(Seq[SqlParam[_]]())((a,b)
+    => a ++ b.params))
   def groupBy (cols: ExprS*) = copy(group = cols.map(_.sql).toList)
   def limit (l: Int): Query = copy(limit = Some(l))
   def offset (o: Int): Query = copy(offset = Some(o))
   def comment (c: String): Query = copy(comment = Some(c))
   
-  def params: Seq[SqlParam[_]] = selectParams ++ queryParams
+  def params: Seq[SqlParam[_]] = selectParams ++ queryParams ++ orderByParams
   
   def sql: String = 
     comment.map(c => "/* " + c + "*/ \n").getOrElse("") +

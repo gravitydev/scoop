@@ -57,13 +57,29 @@ sealed trait SqlExpr [X] extends Sql {self =>
     def sql = self.sql
     def params = self.params
   }
+
+  def desc  = SqlOrdering(this, Descending)
+  def asc   = SqlOrdering(this, Ascending)
 }
+
+abstract class SqlOrder (val sql: String)
+case object Ascending   extends SqlOrder ("ASC")
+case object Descending  extends SqlOrder ("DESC")
+case class SqlOrdering (expr: ast.SqlExpr[_], order: SqlOrder) {
+  def sql = expr.sql + " " + order.sql
+  def params = expr.params
+}
+/*
+
+case class ColumnWrapper [X](col: ast.SqlCol[X]) {
+}
+*/
 
 abstract class BaseSqlExpr [T : SqlType] extends SqlExpr[T] {
   def tp = implicitly[SqlType[T]]
 }
 
-trait SqlNamedExpr [T] {
+trait SqlNamedExpr [T] extends SqlExpr[T] {
   implicit def tp: SqlType[T]
   def name: String
   def sql: String
