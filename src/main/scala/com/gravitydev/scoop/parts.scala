@@ -61,7 +61,7 @@ object PredicateS {
 
 class OrderByS   (s: String, params: Seq[SqlParam[_]]) extends SqlS(s, params)
 object OrderByS {
-  implicit def fromExpr[X](expr: ast.SqlExpr[X]) = expr.asc
+  implicit def fromExpr(expr: ast.SqlExpr[_]) = fromOrdering(expr.asc)
   implicit def fromOrdering(ord: ast.SqlOrdering) = new OrderByS(ord.sql, ord.params)
 }
 class AssignmentS (s: String, params: Seq[SqlParam[_]]) extends SqlS(s, params)

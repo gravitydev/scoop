@@ -75,7 +75,7 @@ class ScoopSpec extends FlatSpec {
     using(tables.users) {u =>
       from(u)
         .where(u.id === 24L)
-        .orderBy(u.id > 24L desc, OrderByS.fromExpr(u.id))
+        .orderBy(u.id > 24L desc, u.id)
         .find(u.id)
     }
   }
