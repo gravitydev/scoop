@@ -42,7 +42,7 @@ object `package` {
   
 
   // starting point
-  def from (table: FromS) = Query(Some(table.sql))
+  def from (table: FromS) = Query(Some(table.sql)).copy(fromParams = table.params)
   def where (pred: PredicateS) = Query(None, predicate = Some(pred.sql), queryParams = pred.params)
   def select (cols: SelectExprS*): Query = Query(None, sel = cols.map(_.sql).toList, selectParams = cols.map(_.params).flatten)
   def insertInto (table: SqlTable[_]) = new InsertBuilder(table._tableName)
@@ -235,6 +235,7 @@ case class Query (
   order:      Option[String]  = None,
   group:      List[String]    = Nil,
   selectParams: Seq[SqlParam[_]] = Nil,
+  fromParams: Seq[SqlParam[_]] = Nil,
   queryParams: Seq[SqlParam[_]] = Nil,
   orderByParams: Seq[SqlParam[_]] = Nil,
   limit:      Option[Int]     = None,
@@ -265,7 +266,9 @@ case class Query (
   def offset (o: Int): Query = copy(offset = Some(o))
   def comment (c: String): Query = copy(comment = Some(c))
   
-  def params: Seq[SqlParam[_]] = selectParams ++ queryParams ++ orderByParams
+  def params: Seq[SqlParam[_]] = selectParams ++ fromParams ++ queryParams ++ orderByParams
+
+  def as (alias: String) = new AliasedSqlFragmentS(sql, alias, params)
   
   def sql: String = 
     comment.map(c => "/* " + c + "*/ \n").getOrElse("") +

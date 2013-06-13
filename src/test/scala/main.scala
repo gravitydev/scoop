@@ -9,7 +9,7 @@ class ScoopSpec extends FlatSpec {
   import ScoopMatchers._
 
   Class forName "com.mysql.jdbc.Driver"
-  implicit lazy val con = java.sql.DriverManager.getConnection("jdbc:mysql://localhost/gravitydev", "root", "")
+  implicit lazy val con = java.sql.DriverManager.getConnection("jdbc:mysql://localhost/scoop_test", "root", "")
   
   "Basic Functions" should "work" in {
     // addition
@@ -77,6 +77,22 @@ class ScoopSpec extends FlatSpec {
         .where(u.id === 24L)
         .orderBy(u.id > 24L desc, u.id)
         .find(u.id)
+    }
+  }
+
+  "A subquery" should "work on the FROM clause" in {
+    using (tables.users) {u =>
+      val sub = from(u).where(u.id === 1)
+
+      val outer = from( sub as "s" )
+    }
+  }
+
+  "A string-based subquery" should "work on the FROM clause" in {
+    using (tables.users) {u =>
+      val sub = "" +~ from(u).sql +~ ""
+
+      val outer = from( sub as "s" )
     }
   }
 
