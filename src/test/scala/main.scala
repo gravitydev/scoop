@@ -83,6 +83,17 @@ class ScoopSpec extends FlatSpec {
   "Parameterized sql on select" should "work" in {
     select("?" %? 1)
   }
+
+  "Subquery on the from clause" should "work" in {
+    using (tables.users) {u =>
+      val subquery = from(u)
+
+      println(subquery as "u")
+
+      //from( subquery as "u" )
+        //.find(int("id"))
+    }
+  }
   
   "Query API" should "work" in {
     val s = select("'hello'")

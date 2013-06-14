@@ -19,7 +19,7 @@ object ScoopBuild extends Build {
   )
 
   /*
-  lazy val plugin = Project(id = "reap-sbt-plugin", base = file("sbt-plugin")).settings(
+  lazy val plugin = Project(id = "scoop-sbt-plugin", base = file("sbt-plugin")).settings(
     sbtPlugin := true,
     libraryDependencies := Seq(
       "mysql" % "mysql-connector-java" % "5.1.18" % "compile"

@@ -32,8 +32,6 @@ object `package` {
   implicit def toParser [X:SqlType] (c: ast.SqlNamedReqExpr[X]) = new ExprParser(c.name, implicitly[SqlType[X]], List(c.sql))
   implicit def toOptParser [X:SqlType] (c: ast.SqlNamedOptExpr[X]) = new OptionalExprParser(c.name, implicitly[SqlType[X]], List(c.sql))
   
-  //implicit def toColumnWrapper [X](c: ast.SqlCol[X]) = ColumnWrapper(c)
-  
   private[scoop] def renderParams (params: Seq[SqlParam[_]]) = params.map(x => x.v + ":"+x.v.asInstanceOf[AnyRef].getClass.getName.stripPrefix("java.lang."))
 }
 
@@ -120,18 +118,3 @@ case class literal [T] (value: T) extends ResultSetParser [T] {
   def columns = Nil
   def apply (rs: ResultSet) = ParseSuccess(value)
 }
-
-/*
-abstract class SqlOrder (val sql: String)
-case object Ascending   extends SqlOrder ("ASC")
-case object Descending  extends SqlOrder ("DESC")
-
-case class SqlOrdering (col: ast.SqlCol[_], order: SqlOrder) {
-  def sql = col.sql + " " + order.sql
-}
-
-case class ColumnWrapper [X](col: ast.SqlCol[X]) {
-  def desc  = SqlOrdering(col, Descending)
-  def asc   = SqlOrdering(col, Ascending)
-}
-*/
