@@ -20,13 +20,19 @@ sealed class SqlFragmentS (sql: String, params: Seq[SqlParam[_]] = Seq()) extend
   def +~ (s: SqlFragmentS) = new SqlFragmentS(sql + s.sql, params ++ s.params)
   def onParams (p: SqlParam[_]*) = new SqlFragmentS(sql, params ++ p.toSeq)
   def %? (p: SqlParam[_]*) = onParams(p:_*)
+  def as (alias: String) = new AliasedSqlFragmentS(sql, alias, params)
 }
 object SqlFragmentS {
   implicit def fromExpr (expr: ast.SqlExpr[_]) = new SqlFragmentS(expr.sql, expr.params)
 }
 
+class AliasedSqlFragmentS (sql: String, alias: String, params: Seq[SqlParam[_]] = Seq()) 
+  extends SqlS("(" + sql + ") as " + alias, params)
+
+// TODO: is this even necessary anymore?
 class ExprS (s: String, params: Seq[SqlParam[_]] = Seq()) extends SqlFragmentS(s, params) {
-  def as (alias: String) = new SelectExprS(s + " as " + alias, params)
+  // TODO: remove this, it should be taken care of by AliasedSqlFragment
+  //def as (alias: String) = new SelectExprS(s + " as " + alias, params)
 }
 object ExprS {
   implicit def fromString (s: String)       = new ExprS(s)
@@ -42,12 +48,14 @@ object SelectExprS {
   implicit def fromFragment (s: SqlFragmentS) = new SelectExprS(s.sql, s.params)
   implicit def fromNamed (expr: ast.SqlNamedExpr[_]) = new SelectExprS(expr.sql + " as " + expr.name, expr.params)
   implicit def fromExprS (expr: ExprS)          = new SelectExprS(expr.sql, expr.params)
+  implicit def fromAliased (a: AliasedSqlFragmentS) = new SelectExprS(a.sql, a.params) 
 }
 
-class FromS           (s: String) extends SqlS(s) 
+class FromS           (s: String, params: Seq[SqlParam[_]] = Seq()) extends SqlS(s, params) 
 object FromS {
   implicit def fromString (s: String) = new FromS(s)
   implicit def fromTable (t: ast.SqlTable[_]) = new FromS(t.sql)
+  implicit def fromAliasSqlFragmentS (s: AliasedSqlFragmentS) = new FromS(s.sql, s.params)
 }
 
 class UpdateQueryableS (s: String) extends SqlS(s)
@@ -72,5 +80,12 @@ class AssignmentS (s: String, params: Seq[SqlParam[_]]) extends SqlS(s, params)
 class QueryS (s: String, params: Seq[SqlParam[_]]) extends SqlFragmentS(s, params) {
   def map [B](process: ResultSet => ParseResult[B])(implicit c: Connection): List[B] = executeQuery(this)(process)
   //def +~ (s: SqlS) = new QueryS(sql + s.sql, params ++ s.params)
+  
+  def executeUpdate ()(implicit c: Connection) = try util.using(c.prepareStatement(sql)) {stmt => 
+    for ((p, idx) <- params.zipWithIndex) p(stmt, idx+1)
+    stmt.executeUpdate()
+  } catch {
+    case e: java.sql.SQLException => throw new Exception("SQL Exception ["+e.getMessage+"] when executing query ["+sql+"] with parameters: ["+params+"]")
+  }
 }
 
