@@ -88,6 +88,27 @@ class ScoopSpec extends FlatSpec {
     }
   }
 
+  "An update with Option[SqlAssignment]" should "inhibit None values" in {
+    using (tables.users) {u =>
+      val q = update(u)
+        .set(
+          Some(u.first_name := "check"),
+          None,
+          u.last_name := "Some other value"
+        )
+        .where(u.id === -1)
+
+      println(q.sql)
+    }
+  }
+
+  "A string based subquery" should "work on the SELECT clause" in {
+    using (tables.users) {u =>
+      from (u)
+        .find( sql[Boolean]("(SELECT ?)" %? 1) as "someBool" )
+    }
+  }
+
   "A string-based subquery" should "work on the FROM clause" in {
     using (tables.users) {u =>
       val sub = "" +~ from(u).sql +~ ""

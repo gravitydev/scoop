@@ -30,6 +30,7 @@ object `package` {
   implicit def predToPredicateS (pred: SqlExpr[Boolean]) = new PredicateS(pred.sql, pred.params)
   //implicit def orderingToOrder (o: SqlOrdering)   = new OrderByS(o.sql)
   implicit def assignmentToAssignmentS (a: SqlAssignment[_]) = new AssignmentS(a.sql, a.params)
+  implicit def optionalAssignmentToAssignmentS (a: Option[SqlAssignment[_]]) = a map assignmentToAssignmentS getOrElse new AssignmentS("",Nil)
   implicit def queryToQueryS (q: Query)           = new QueryS(q.sql, q.params)
   
   implicit def listToExpr (l: List[String]) = l.map(x => x: ExprS)
@@ -120,8 +121,8 @@ case class Join (table: String, predicate: String, params: Seq[SqlParam[_]]) {
 }
 
 class InsertBuilder (into: String) {
-  def set (assignments: AssignmentS*) = Insert (into, assignments.map(_.sql).toList, assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params})
-  def values (assignments: SqlAssignment[_]*) = Insert2(into, assignments.toList)
+  def set (assignments: AssignmentS*) = Insert (into, assignments.map(_.sql).filter(_.nonEmpty).toList, assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params})
+  def values (assignments: SqlAssignment[_]*) = Insert2(into, assignments.filter(_.sql.nonEmpty).toList)
   def apply (columns: SqlCol[_]*) = new InsertBuilder2(into, columns)
 }
 class InsertBuilder2 (into: String, columns: Seq[SqlCol[_]]) {
@@ -129,7 +130,7 @@ class InsertBuilder2 (into: String, columns: Seq[SqlCol[_]]) {
 }
 
 class UpdateBuilder (tb: UpdateQueryableS) {
-  def set (assignments: AssignmentS*) = Update (tb.sql, assignments.map(_.sql).toList, None, assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params})
+  def set (assignments: AssignmentS*) = Update (tb.sql, assignments.map(_.sql).filter(_.nonEmpty).toList, None, assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params})
 }
 
 class DeleteBuilder (tb: UpdateQueryableS) {
