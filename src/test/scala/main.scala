@@ -35,6 +35,12 @@ class ScoopSpec extends FlatSpec {
     }
   }
 
+  "Parsers" should "work with aliased expressions" in {
+    using (tables.users) {u =>
+      from(u).find(Parsers.total( functions.count(u.id) as "test" ))
+    }
+  }
+
   "Subquery expression" should "work" in {
     using (tables.users) {u => 
       val q = from(u)
@@ -88,7 +94,7 @@ class ScoopSpec extends FlatSpec {
     }
   }
 
-  "An update with Option[SqlAssignment]" should "inhibit None values" in {
+  "An update with Option[SqlAssignment]" should "inhibit None assignments" in {
     using (tables.users) {u =>
       val q = update(u)
         .set(

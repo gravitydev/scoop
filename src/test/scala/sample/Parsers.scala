@@ -6,6 +6,8 @@ import Data._
 
 object Parsers {
   def user (u: tables.users) = u.id ~ u.first_name ~ u.last_name >> {(i,f,l) => User(i,f+" "+l)}
+
+  def total (count: ExprParser[Int]) = count >> (x => x)
  
   //val rep = user(users)
   
