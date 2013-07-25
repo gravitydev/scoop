@@ -12,30 +12,30 @@ sealed trait SqlExpr [X] extends Sql {self =>
   
   def params: Seq[SqlParam[_]]
   
-  def === (v: SqlExpr[X]) = SqlInfixExpr[X,X,Boolean](this, v, "=")
+  def === (v: SqlExpr[X]) = SqlInfixExpr[/*X,X,*/Boolean](this, v, "=")
 
-  def <> (v: SqlExpr[X]) = SqlInfixExpr[X,X,Boolean](this, v, "<>")
+  def <> (v: SqlExpr[X]) = SqlInfixExpr[/*X,X,*/Boolean](this, v, "<>")
   
   // alias
   def |=| (v: SqlExpr[X]) = === (v)
   
-  def <   (v: SqlExpr[X]) = SqlInfixExpr[X,X,Boolean](this, v, "<")
-  def <=  (v: SqlExpr[X]) = SqlInfixExpr[X,X,Boolean](this, v, "<=")
-  def >   (v: SqlExpr[X]) = SqlInfixExpr[X,X,Boolean](this, v, ">")
-  def >=  (v: SqlExpr[X]) = SqlInfixExpr[X,X,Boolean](this, v, ">=")
+  def <   (v: SqlExpr[X]) = SqlInfixExpr[Boolean](this, v, "<")
+  def <=  (v: SqlExpr[X]) = SqlInfixExpr[Boolean](this, v, "<=")
+  def >   (v: SqlExpr[X]) = SqlInfixExpr[Boolean](this, v, ">")
+  def >=  (v: SqlExpr[X]) = SqlInfixExpr[Boolean](this, v, ">=")
   
   // it would be nice to have a view bound here
   def in (v: Set[X])(implicit tp: SqlType[X]) = { // is the implicit needed here
-    SqlInfixExpr[X,Set[X],Boolean](this, SqlLiteralSetExpr(v), "IN")
+    SqlInfixExpr[Boolean](this, SqlLiteralSetExpr(v), "IN")
   }
   
   def notIn (v: Set[X])(implicit tp: SqlType[X]) = {
-    SqlInfixExpr[X,Set[X],Boolean](this, SqlLiteralSetExpr(v), "NOT IN")
+    SqlInfixExpr[Boolean](this, SqlLiteralSetExpr(v), "NOT IN")
   }
  
   // should I get rid of these in favor of the symbolic ones?
-  def and (v: SqlExpr[Boolean])(implicit ev: SqlExpr[X] =:= SqlExpr[Boolean]) = SqlInfixExpr[Boolean,Boolean,Boolean](ev(this), v, "AND")
-  def or  (v: SqlExpr[Boolean])(implicit ev: SqlExpr[X] =:= SqlExpr[Boolean]) = SqlInfixExpr[Boolean,Boolean,Boolean](ev(this), v, "OR")
+  def and (v: SqlExpr[Boolean])(implicit ev: SqlExpr[X] =:= SqlExpr[Boolean]) = SqlInfixExpr[Boolean](ev(this), v, "AND")
+  def or  (v: SqlExpr[Boolean])(implicit ev: SqlExpr[X] =:= SqlExpr[Boolean]) = SqlInfixExpr[Boolean](ev(this), v, "OR")
   
   // symbolic aliases for better precedence rules
   def && (v: SqlExpr[Boolean])(implicit ev: SqlExpr[X] =:= SqlExpr[Boolean]) = and(v)
@@ -44,12 +44,12 @@ sealed trait SqlExpr [X] extends Sql {self =>
   def isNull = SqlUnaryExpr[X,Boolean](this, "IS NULL", postfix=true)
   def isNotNull = SqlUnaryExpr[X,Boolean](this, "IS NOT NULL", postfix=true)
 
-  def like (v: SqlLiteralExpr[String])(implicit ev: X =:= String) = SqlInfixExpr[X,String,Boolean](this, v, "LIKE")
-  def notLike (v: SqlLiteralExpr[String])(implicit ev: X =:= String) = SqlInfixExpr[X,String,Boolean](this, v, "NOT LIKE")
-  
+  def like (v: SqlLiteralExpr[String])(implicit ev: X =:= String) = SqlInfixExpr[Boolean](this, v, "LIKE")
+  def notLike (v: SqlLiteralExpr[String])(implicit ev: X =:= String) = SqlInfixExpr[Boolean](this, v, "NOT LIKE")
+ 
   // TODO: decimals
-  def + [T](v: SqlLiteralExpr[T])(implicit tp: SqlType[T], tp2: SqlType[X], ev: X => Long, ev2: T => Long) = SqlInfixExpr[X,T,Long](this, v, "+")
-  def - [T](v: SqlLiteralExpr[T])(implicit tp: SqlType[T], tp2: SqlType[X], ev: X => Long, ev2: T => Long) = SqlInfixExpr[X,T,Long](this, v, "-")
+  def + [T,N](v: SqlExpr[T])(implicit ev1: SqlExpr[X]=>SqlExpr[N], ev2: SqlExpr[T]=>SqlExpr[N], ev3: SqlType[N]) = SqlInfixExpr[N](this, v, "+")
+  def - [T,N](v: SqlExpr[T])(implicit ev1: SqlExpr[X]=>SqlExpr[N], ev2: SqlExpr[T]=>SqlExpr[N], ev3: SqlType[N]) = SqlInfixExpr[N](this, v, "-")
   
   def as (alias: String)(implicit t: SqlType[X]) = new SqlNamedReqExpr[X] {
     val tp = t
@@ -60,6 +60,18 @@ sealed trait SqlExpr [X] extends Sql {self =>
 
   def desc  = SqlOrdering(this, Descending)
   def asc   = SqlOrdering(this, Ascending)
+
+  type TypeMapper[A,B] = SqlType[A] => SqlType[B]
+  type ExprMapper[A,B,C] = SqlExpr[A] => SqlExpr[B] => SqlExpr[C]
+}
+
+object SqlExpr extends LowerPriorityImplicits {
+  implicit def intToSqlLongLit (base: Int): SqlExpr[Long] = SqlLiteralExpr(base: Long)
+}
+
+class SqlWrappedExpr [T,X] (sqlExpr: SqlExpr[T])(implicit val tp: SqlType[X]) extends SqlExpr[X] {
+  def params = sqlExpr.params
+  def sql = sqlExpr.sql
 }
 
 abstract class SqlOrder (val sql: String)
@@ -146,7 +158,7 @@ class SqlAssignment [T : SqlType](val col: SqlCol[T], value: SqlExpr[T]) extends
   override def params = value.params
 }
 
-case class SqlInfixExpr [L:SqlType, R:SqlType, T:SqlType](l: SqlExpr[L], r: SqlExpr[R], op: String) extends BaseSqlExpr[T] {
+case class SqlInfixExpr [T:SqlType](l: SqlExpr[_], r: SqlExpr[_], op: String) extends BaseSqlExpr[T] {
   def params = l.params ++ r.params
   def sql = "(" + l.sql + " " + op + " " + r.sql + ")"
   override def toString = "SqlInfixExpr(sql=" + sql + ", params=" + renderParams(params) + ")"

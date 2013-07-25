@@ -2,7 +2,11 @@ package com.gravitydev.scoop
 
 import java.sql.{ResultSet, PreparedStatement, Types, Timestamp, Date}
 
-object `package` {
+trait LowerPriorityImplicits {
+  //implicit object int        extends SqlNativeType [Int]          (Types.INTEGER,   _ getInt _,       _ setInt (_,_))  
+}
+
+object `package` extends LowerPriorityImplicits {
   type Table[T <: ast.SqlTable[T]] = ast.SqlTable[T]
   type TableCompanion[T <: Table[T]] = {def apply() : T}
 

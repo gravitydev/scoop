@@ -30,6 +30,7 @@ object Data {
       def last_name   = col[String]       ('last_name)
       def email       = col[String]       ('email)
       def data        = col[AnyRef]       ('email)
+      def age         = col[Int]          ('age)
     }
   }
   

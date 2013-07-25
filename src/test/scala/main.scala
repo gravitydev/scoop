@@ -25,7 +25,8 @@ class ScoopSpec extends FlatSpec {
   
   "Implicits" should "work" in {
     using (tables.issues as "i") {i =>
-      i.id + 1 as "test"
+      val assignment = i.id := i.id + 1 // as "test"
+      println(assignment)
     }
   }
   
@@ -131,11 +132,18 @@ class ScoopSpec extends FlatSpec {
         //.find(int("id"))
     }
   }
+
+  "An assignment" should "allow expressions" in {
+    using (tables.users) {u =>
+      val q = update(u)
+        .set(u.age := u.age + (1:ast.SqlExpr[Int]))
+
+      println(q)
+    }
+  }
   
   "Query API" should "work" in {
     val s = select("'hello'")
-    println(s)
-
     using (tables.users) {u =>
       val insertQ = insertInto(u)(u.id, u.first_name).values(from(u).where(u.id === 24L).select(u.id, u.last_name))
     }
@@ -164,7 +172,7 @@ class ScoopSpec extends FlatSpec {
     val folded = mapped.foldLeft(false : ast.SqlExpr[Boolean])(_ or _)
 
     {
-      val x = "(" +~ from(u).where(u.id === 24) +~ ") UNION (" +~ from(i).where(i.id === 13) +~ ")"
+      val x = "(" +~ from(u).where(u.id |=| 24) +~ ") UNION (" +~ from(i).where(i.id === 13) +~ ")"
     }
 
     {
@@ -190,7 +198,7 @@ class ScoopSpec extends FlatSpec {
     
     val num = "SELECT 1 as num FROM users WHERE 1 = ?" %? 1 map int("num") head;
 
-    val n = i.id |=| intToSqlLongLit(24)
+    val n = i.id |=| 24
  
     val q = from(i)
       .innerJoin (u on i.reported_by === u.id)

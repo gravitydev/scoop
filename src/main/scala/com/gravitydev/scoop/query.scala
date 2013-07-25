@@ -5,22 +5,23 @@ import java.sql.{Connection, Date, Timestamp, ResultSet}
 import scala.collection.mutable.ListBuffer
 import collection._, ast._
 
-object `package` {
+trait LowerPriorityImplicit {
+}
+
+object `package` extends LowerPriorityImplicit {
   type Predicate = ast.SqlExpr[Boolean]
   
   implicit def stringToFragment (s: String) = new SqlFragmentS(s, Seq())
   implicit def fromExpr (expr: ast.SqlExpr[_]) = new ExprS(expr.sql, expr.params)
   
+  implicit def intToLongExpr (a: SqlExpr[Int]): SqlExpr[Long] = new SqlWrappedExpr[Int,Long](a)(long)
+  implicit def baseToSqlLit [T](base: T)(implicit sqlType: SqlType[T]): SqlExpr[T] = SqlLiteralExpr(base)
   implicit def tableToWrapped [T <: SqlTable[_]] (t: T) = new TableWrapper(t)
-  implicit def baseToSqlLit [T](base: T)(implicit sqlType: SqlType[T]) = SqlLiteralExpr(base)
-  implicit def intToSqlLongLit (base: Int): SqlLiteralExpr[Long] = SqlLiteralExpr(base: Long)
   implicit def optToSqlLit [T](base: Option[T])(implicit sqlType: SqlType[T]) = base map {x => SqlLiteralExpr(x)}
   implicit def baseToParam [T](base: T)(implicit sqlType: SqlType[T]) = SqlSingleParam(base)
 
   implicit def toJoin (s: String)         = new JoinS(s, Nil)
   implicit def toPredicate (s: String)    = new PredicateS(s, Nil)
-  //implicit def toQuery (s: String)        = new QueryS(s, Seq())
-  //implicit def predicateToQueryS (p: PredicateS) = new QueryS(p.sql, p.params)
   implicit def fragmentToQueryS (s: SqlFragmentS) = new QueryS(s.sql, s.params)
   implicit def querySToPredicate (p: QueryS) = new PredicateS(p.sql, p.params)
   implicit def toOrder (s: String)        = new OrderByS(s, Nil)
@@ -28,7 +29,6 @@ object `package` {
   implicit def tableToUpdate(t: SqlTable[_])      = new UpdateQueryableS(t.sql)
   implicit def joinToJoin (j: Join)               = new JoinS(j.sql, j.params)
   implicit def predToPredicateS (pred: SqlExpr[Boolean]) = new PredicateS(pred.sql, pred.params)
-  //implicit def orderingToOrder (o: SqlOrdering)   = new OrderByS(o.sql)
   implicit def assignmentToAssignmentS (a: SqlAssignment[_]) = new AssignmentS(a.sql, a.params)
   implicit def optionalAssignmentToAssignmentS (a: Option[SqlAssignment[_]]) = a map assignmentToAssignmentS getOrElse new AssignmentS("",Nil)
   implicit def queryToQueryS (q: Query)           = new QueryS(q.sql, q.params)
