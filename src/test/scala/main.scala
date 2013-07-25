@@ -11,16 +11,14 @@ class ScoopSpec extends FlatSpec {
   Class forName "com.mysql.jdbc.Driver"
   implicit lazy val con = java.sql.DriverManager.getConnection("jdbc:mysql://localhost/scoop_test", "root", "")
   
-  "Basic Functions" should "work" in {
-    // addition
-    {
-      val x: SelectExprS = ((1 : ast.SqlExpr[Int]) + 2) as "a"
-      x should matchSql("(? + ?) as a", 1, 2)
-    }
-    {
-      val x: SelectExprS = ((1: ast.SqlExpr[Int]) - 2) as "b"
-      x should matchSql("(? - ?) as b", 1, 2)
-    }
+  "Basic number operators" should "work" in {
+    val num: ast.SqlExpr[Int] = 1 
+    def s (exp: SelectExprS) = exp // force conversion
+
+    s(num + 2 as "a") should matchSql("(? + ?) as a", 1, 2)
+    s(num - 2 as "a") should matchSql("(? - ?) as a", 1, 2)
+    s(num * 2 as "a") should matchSql("(? * ?) as a", 1, 2)
+    s(num / 2 as "a") should matchSql("(? / ?) as a", 1, 2)
   }
   
   "Implicits" should "work" in {
@@ -106,6 +104,14 @@ class ScoopSpec extends FlatSpec {
         .where(u.id === -1)
 
       println(q.sql)
+    }
+  }
+
+  "A comparisons" should "work with literal types" in {
+    using (tables.users) {u =>
+      val p1: Predicate = u.first_name === "somename"
+      val p2: Predicate = u.first_name like "somename"
+      val p3: Predicate = u.first_name in Set("one", "two")
     }
   }
 

@@ -12,9 +12,9 @@ sealed trait SqlExpr [X] extends Sql {self =>
   
   def params: Seq[SqlParam[_]]
   
-  def === (v: SqlExpr[X]) = SqlInfixExpr[/*X,X,*/Boolean](this, v, "=")
+  def === (v: SqlExpr[X]) = SqlInfixExpr[Boolean](this, v, "=")
 
-  def <> (v: SqlExpr[X]) = SqlInfixExpr[/*X,X,*/Boolean](this, v, "<>")
+  def <> (v: SqlExpr[X]) = SqlInfixExpr[Boolean](this, v, "<>")
   
   // alias
   def |=| (v: SqlExpr[X]) = === (v)
@@ -44,12 +44,14 @@ sealed trait SqlExpr [X] extends Sql {self =>
   def isNull = SqlUnaryExpr[X,Boolean](this, "IS NULL", postfix=true)
   def isNotNull = SqlUnaryExpr[X,Boolean](this, "IS NOT NULL", postfix=true)
 
-  def like (v: SqlLiteralExpr[String])(implicit ev: X =:= String) = SqlInfixExpr[Boolean](this, v, "LIKE")
-  def notLike (v: SqlLiteralExpr[String])(implicit ev: X =:= String) = SqlInfixExpr[Boolean](this, v, "NOT LIKE")
+  def like (v: SqlExpr[String])(implicit ev: X =:= String) = SqlInfixExpr[Boolean](this, v, "LIKE")
+  def notLike (v: SqlExpr[String])(implicit ev: X =:= String) = SqlInfixExpr[Boolean](this, v, "NOT LIKE")
  
   // TODO: decimals
   def + [T,N](v: SqlExpr[T])(implicit ev1: SqlExpr[X]=>SqlExpr[N], ev2: SqlExpr[T]=>SqlExpr[N], ev3: SqlType[N]) = SqlInfixExpr[N](this, v, "+")
   def - [T,N](v: SqlExpr[T])(implicit ev1: SqlExpr[X]=>SqlExpr[N], ev2: SqlExpr[T]=>SqlExpr[N], ev3: SqlType[N]) = SqlInfixExpr[N](this, v, "-")
+  def * [T,N](v: SqlExpr[T])(implicit ev1: SqlExpr[X]=>SqlExpr[N], ev2: SqlExpr[T]=>SqlExpr[N], ev3: SqlType[N]) = SqlInfixExpr[N](this, v, "*")
+  def / [T,N](v: SqlExpr[T])(implicit ev1: SqlExpr[X]=>SqlExpr[N], ev2: SqlExpr[T]=>SqlExpr[N], ev3: SqlType[N]) = SqlInfixExpr[N](this, v, "/")
   
   def as (alias: String)(implicit t: SqlType[X]) = new SqlNamedReqExpr[X] {
     val tp = t
