@@ -93,6 +93,26 @@ class ScoopSpec extends FlatSpec {
     }
   }
 
+  "Table and query aliases" should "be able to generate column aliases" in {
+    using (tables.users) {u =>
+      val sub = from(u).select(u.id) as "sub"
+      val a = u[String]("a")
+      val b = sub[Long]("id")
+    }
+  }
+
+  /*
+  "A subquery" should "work on the JOIN clause" in {
+    using(tables.users) {u =>
+      val sub = from(u).where(u.id === 1).select(u.id) as "p"
+
+      val outer = from(u)
+        .innerJoin(sub on u.id === sub("id"))
+        .find(u.id ~ sub("id"))
+    }
+  }
+  */
+
   "An update with Option[SqlAssignment]" should "inhibit None assignments" in {
     using (tables.users) {u =>
       val q = update(u)

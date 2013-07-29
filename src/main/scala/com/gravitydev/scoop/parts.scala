@@ -27,13 +27,14 @@ object SqlFragmentS {
 }
 
 class AliasedSqlFragmentS (sql: String, alias: String, params: Seq[SqlParam[_]] = Seq()) 
-  extends SqlS("(" + sql + ") as " + alias, params)
+    extends SqlS("(" + sql + ") as " + alias, params) {
+ 
+  // generate a column alias
+  def apply [X:SqlType](column: String) = new ast.SqlRawExpr[X](alias+"."+column)
+}
 
 // TODO: is this even necessary anymore?
-class ExprS (s: String, params: Seq[SqlParam[_]] = Seq()) extends SqlFragmentS(s, params) {
-  // TODO: remove this, it should be taken care of by AliasedSqlFragment
-  //def as (alias: String) = new SelectExprS(s + " as " + alias, params)
-}
+class ExprS (s: String, params: Seq[SqlParam[_]] = Seq()) extends SqlFragmentS(s, params) 
 object ExprS {
   implicit def fromString (s: String)       = new ExprS(s)
   implicit def fromCol (col: ast.SqlCol[_]) = new ExprS(col.sql)

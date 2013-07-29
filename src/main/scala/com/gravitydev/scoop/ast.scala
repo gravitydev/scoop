@@ -83,11 +83,6 @@ case class SqlOrdering (expr: ast.SqlExpr[_], order: SqlOrder) {
   def sql = expr.sql + " " + order.sql
   def params = expr.params
 }
-/*
-
-case class ColumnWrapper [X](col: ast.SqlCol[X]) {
-}
-*/
 
 abstract class BaseSqlExpr [T : SqlType] extends SqlExpr[T] {
   def tp = implicitly[SqlType[T]]
@@ -98,6 +93,9 @@ trait SqlNamedExpr [T] extends SqlExpr[T] {
   def name: String
   def sql: String
   def params: Seq[SqlParam[_]]
+
+  // this should only be applicable to sub-queries
+  def apply [X:SqlType](column: String) = new SqlRawExpr[X](name+"."+column)
 }
 trait SqlNamedReqExpr [T] extends SqlNamedExpr[T] {self =>
   def as (alias: String) = new BaseSqlExpr [T] with SqlNamedReqExpr [T] {
@@ -148,6 +146,9 @@ abstract class SqlTable [T <: SqlTable[T]](_companion: TableCompanion[T], tableN
   
   // so it can serve as a companion
   def apply (): T = this
+
+  // generate a column alias
+  def apply [X:SqlType](column: String) = new SqlRawExpr[X](_alias+"."+column)
   
   def sql = if (_tableName == _alias) _tableName else _tableName + " as " + _alias
   def updateSql = _tableName
@@ -171,8 +172,6 @@ sealed abstract class SqlCol[T:SqlType] (val cast: Option[String], table: SqlTab
   def name: String = Option(alias) getOrElse (table._prefix + columnName)
   val params = Nil
   def sql = table._alias + "." + columnName + cast.map(_=>"::varchar").getOrElse("") // TODO: use correct base type
-  //def selectSql = sql + (if (table._prefix!="") " as " + _alias else "")
-  //def as (s: String): SqlCol[T]
 }
 
 class SqlNonNullableCol[T:SqlType](val columnName: String, cast: Option[String], table: SqlTable[_], sqlType: SqlType[T], alias: String = null) 
@@ -181,7 +180,6 @@ class SqlNonNullableCol[T:SqlType](val columnName: String, cast: Option[String],
   override def toString = "Col(" + columnName + " as " + name + ")"
   def nullable = new SqlNullableCol(columnName, cast, table, sqlType)
   def := (x: SqlExpr[T]) = new SqlAssignment(this, x)
-  //override def as (s: String): SqlNonNullableCol[T] = new SqlNonNullableCol[T](columnName, cast, table, sqlType, s)
 }
 
 class SqlNullableCol[T:SqlType](val columnName: String, cast: Option[String], table: SqlTable[_], sqlType: SqlType[T], alias: String = null) 
@@ -189,7 +187,6 @@ class SqlNullableCol[T:SqlType](val columnName: String, cast: Option[String], ta
   def parse (rs: ResultSet) = Some(sqlType.parse(rs, name))
   override def toString = "Col("+ columnName + " as " + name +" : Nullable)"
   def := (x: Option[SqlExpr[T]]) = new SqlAssignment(this, x getOrElse new SqlRawExpr[T]("NULL"))
-  //override def as (s: String) = new SqlNullableCol[T](columnName, cast, table, sqlType, s)
 }
 
 case class SqlUnaryExpr [L:SqlType,T:SqlType](l: SqlExpr[L], op: String, postfix: Boolean) extends BaseSqlExpr [T] {
