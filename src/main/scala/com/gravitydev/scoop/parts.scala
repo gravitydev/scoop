@@ -26,11 +26,14 @@ object SqlFragmentS {
   implicit def fromExpr (expr: ast.SqlExpr[_]) = new SqlFragmentS(expr.sql, expr.params)
 }
 
-class AliasedSqlFragmentS (sql: String, alias: String, params: Seq[SqlParam[_]] = Seq()) 
-    extends SqlS("(" + sql + ") as " + alias, params) {
+class AliasedSqlFragmentS (_sql: String, alias: String, params: Seq[SqlParam[_]] = Seq()) 
+    extends SqlS("(" + util.formatSubExpr(_sql) + ") as " + alias, params) {
  
   // generate a column alias
   def apply [X:SqlType](column: String) = new ast.SqlRawExpr[X](alias+"."+column)
+  def apply [X:SqlType](col: ast.SqlNamedExpr[X]) = new ast.SqlRawExpr[X](alias+"."+col.name).as(col.name)
+
+  def on (pred: ast.SqlExpr[Boolean]) = Join(this.sql, pred.sql, params ++ pred.params)
 }
 
 // TODO: is this even necessary anymore?
@@ -57,6 +60,7 @@ object FromS {
   implicit def fromString (s: String) = new FromS(s)
   implicit def fromTable (t: ast.SqlTable[_]) = new FromS(t.sql)
   implicit def fromAliasSqlFragmentS (s: AliasedSqlFragmentS) = new FromS(s.sql, s.params)
+  implicit def fromNamedQueryExpr (q: ast.SqlNamedQueryExpr[_]) = new FromS(q.sql, q.params)
 }
 
 class UpdateQueryableS (s: String) extends SqlS(s)
