@@ -49,10 +49,11 @@ object ExprS {
 class SelectExprS     (s: String, params: Seq[SqlParam[_]] = Nil) extends SqlS(s, params)
 object SelectExprS {
   implicit def fromString (s: String)           = new SelectExprS(s)
-  implicit def fromFragment (s: SqlFragmentS) = new SelectExprS(s.sql, s.params)
-  implicit def fromNamed (expr: ast.SqlNamedExpr[_]) = new SelectExprS(expr.sql + " as " + expr.name, expr.params)
+  implicit def fromFragment (s: SqlFragmentS)   = new SelectExprS(s.sql, s.params)
+  implicit def fromNamed (expr: ast.SqlNamedExpr[_]) = new SelectExprS(expr.sql, expr.params)
   implicit def fromExprS (expr: ExprS)          = new SelectExprS(expr.sql, expr.params)
   implicit def fromAliased (a: AliasedSqlFragmentS) = new SelectExprS(a.sql, a.params) 
+  implicit def fromCol (a: ast.SqlCol[_])       = new SelectExprS(a.sql + " as " + a.name, a.params)
 }
 
 class FromS           (s: String, params: Seq[SqlParam[_]] = Seq()) extends SqlS(s, params) 

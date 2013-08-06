@@ -36,8 +36,14 @@ class ScoopSpec extends FlatSpec {
 
   "Parsers" should "work with aliased expressions" in {
     using (tables.users) {u =>
+      println(Parsers.total( functions.count(u.id) as "test" ).columns)
       from(u).find(Parsers.total( functions.count(u.id) as "test" ))
     }
+  }
+  
+  "Functions" should "output correct sql" in {
+    functions.coalesce(1, 0).as("total") should matchSql("COALESCE(?, ?) as total", 1, 0)
+    select(functions.count(1).as("total"), 4 as "num") should matchSql("SELECT COUNT(?) as total, ? as num", 1, 4)
   }
 
   "Subquery expression" should "work" in {

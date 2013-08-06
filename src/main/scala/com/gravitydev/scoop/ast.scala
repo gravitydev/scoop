@@ -56,7 +56,7 @@ sealed trait SqlExpr [X] extends Sql {self =>
   def as (alias: String)(implicit t: SqlType[X]) = new SqlNamedReqExpr[X] {
     val tp = t
     def name = alias
-    def sql = self.sql
+    def sql = self.sql + " as " + alias
     def params = self.params
   }
 
@@ -67,7 +67,7 @@ sealed trait SqlExpr [X] extends Sql {self =>
   type ExprMapper[A,B,C] = SqlExpr[A] => SqlExpr[B] => SqlExpr[C]
 }
 
-object SqlExpr extends LowerPriorityImplicits {
+object SqlExpr {
   implicit def intToSqlLongLit (base: Int): SqlExpr[Long] = SqlLiteralExpr(base: Long)
 }
 
@@ -88,7 +88,7 @@ abstract class BaseSqlExpr [T : SqlType] extends SqlExpr[T] {
   def tp = implicitly[SqlType[T]]
 }
 
-trait SqlNamedExpr [T] extends SqlExpr[T] {
+trait SqlNamedExpr [T] extends SqlExpr[T] {self =>
   implicit def tp: SqlType[T]
   def name: String
   def sql: String
@@ -96,6 +96,16 @@ trait SqlNamedExpr [T] extends SqlExpr[T] {
 
   // this should only be applicable to sub-queries
   def apply [X:SqlType](column: String) = new SqlRawExpr[X](name+"."+column)
+  def apply [X:SqlType](col: SqlNonNullableCol[X]) = new BaseSqlExpr[X] with SqlNamedReqExpr[X] {
+    def name = col.name
+    def sql = self.name+"."+col.name
+    def params = col.params
+  }
+  def apply [X:SqlType](col: SqlNullableCol[X]) = new BaseSqlExpr[X] with SqlNamedOptExpr[X] {
+    def name = col.name
+    def sql = self.name+"."+col.name
+    def params = col.params
+  }
   def apply [X:SqlType](col: SqlNamedExpr[X]) = new SqlRawExpr[X](name+"."+col.name).as(col.name)
 
   def on (pred: SqlExpr[Boolean]) = query.Join(sql, pred.sql, params ++ pred.params)
@@ -107,6 +117,13 @@ trait SqlNamedReqExpr [T] extends SqlNamedExpr[T] {self =>
     def params = self.params
   }
   def parse (rs: ResultSet) = tp.parse(rs, name)
+}
+object SqlNamedExpr {
+  implicit def fromCol [T:SqlType](c: SqlNonNullableCol[T]) = new BaseSqlExpr[T] with SqlNamedReqExpr[T] {
+    def name = c.name
+    def sql = c.sql + " as " + c.name
+    def params = c.params
+  }
 }
 trait SqlNamedOptExpr [T] extends SqlNamedExpr[T] {self =>
   def as (alias: String) = new BaseSqlExpr [T] with SqlNamedOptExpr [T] {
@@ -186,14 +203,14 @@ sealed abstract class SqlCol[T:SqlType] (val cast: Option[String], table: SqlTab
 }
 
 class SqlNonNullableCol[T:SqlType](val columnName: String, cast: Option[String], table: SqlTable[_], sqlType: SqlType[T], alias: String = null) 
-    extends SqlCol[T] (cast, table, sqlType, alias) with SqlNamedReqExpr[T] {
+    extends SqlCol[T] (cast, table, sqlType, alias) /*with SqlNamedReqExpr[T]*/ {
   override def toString = "Col(" + columnName + " as " + name + ")"
   def nullable = new SqlNullableCol(columnName, cast, table, sqlType)
   def := (x: SqlExpr[T]) = new SqlAssignment(this, x)
 }
 
 class SqlNullableCol[T:SqlType](val columnName: String, cast: Option[String], table: SqlTable[_], sqlType: SqlType[T], alias: String = null) 
-    extends SqlCol[T] (cast, table, sqlType, alias) with SqlNamedOptExpr[T] {
+    extends SqlCol[T] (cast, table, sqlType, alias) /*with SqlNamedOptExpr[T]*/ {
   override def toString = "Col("+ columnName + " as " + name +" : Nullable)"
   def := (x: Option[SqlExpr[T]]) = new SqlAssignment(this, x getOrElse new SqlRawExpr[T]("NULL"))
 }
