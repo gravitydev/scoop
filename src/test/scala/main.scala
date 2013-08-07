@@ -36,7 +36,6 @@ class ScoopSpec extends FlatSpec {
 
   "Parsers" should "work with aliased expressions" in {
     using (tables.users) {u =>
-      println(Parsers.total( functions.count(u.id) as "test" ).columns)
       from(u).find(Parsers.total( functions.count(u.id) as "test" ))
     }
   }

@@ -33,6 +33,17 @@ class AliasedSqlFragmentS (_sql: String, alias: String, params: Seq[SqlParam[_]]
   def apply [X:SqlType](column: String) = new ast.SqlRawExpr[X](alias+"."+column)
   def apply [X:SqlType](col: ast.SqlNamedExpr[X]) = new ast.SqlRawExpr[X](alias+"."+col.name).as(col.name)
 
+  def apply [X:SqlType](col: ast.SqlNonNullableCol[X]) = new ast.BaseSqlExpr[X] with ast.SqlNamedReqExpr[X] {
+    def name = col.name
+    def sql = alias+"."+col.name
+    def params = col.params
+  }
+  def apply [X:SqlType](col: ast.SqlNullableCol[X]) = new ast.BaseSqlExpr[X] with ast.SqlNamedOptExpr[X] {
+    def name = col.name
+    def sql = alias+"."+col.name
+    def params = col.params
+  }
+
   def on (pred: ast.SqlExpr[Boolean]) = Join(this.sql, pred.sql, params ++ pred.params)
 }
 
