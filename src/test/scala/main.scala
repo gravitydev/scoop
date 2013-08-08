@@ -41,8 +41,17 @@ class ScoopSpec extends FlatSpec {
   }
   
   "Functions" should "output correct sql" in {
-    functions.coalesce(1, 0).as("total") should matchSql("COALESCE(?, ?) as total", 1, 0)
-    select(functions.count(1).as("total"), 4 as "num") should matchSql("SELECT COUNT(?) as total, ? as num", 1, 4)
+    import functions._
+    coalesce(1, 0).as("total") should matchSql("COALESCE(?, ?) as total", 1, 0)
+    select(count(1).as("total"), 4 as "num") should matchSql("SELECT COUNT(?) as total, ? as num", 1, 4)
+    select(coalesce(countDistinct(1), 0) as "total", 4 as "num") should matchSql("SELECT COALESCE(COUNT(DISTINCT ?), ?) as total, ? as num", 1, 0, 4)
+
+    using (tables.users as "u") {u =>
+      coalesce(u.id, 0L).as("v") should matchSql("COALESCE(u.id, ?) as v", 0L)
+      println(coalesce(u.id, 0L).as("v").columns)
+      from(u)
+        .find(coalesce(countDistinct(u.id), 0).as("total"))
+    }
   }
 
   "Subquery expression" should "work" in {

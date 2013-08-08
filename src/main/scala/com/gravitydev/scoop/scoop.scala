@@ -30,9 +30,9 @@ object `package` {
   implicit def setT[X:SqlType] = new SqlNativeType [Set[X]]       (-1, (_,_) => sys.error("internal"), (_,_,_) => sys.error("internal")) {}
  
   // TODO: handle params
-  implicit def toParser [X:SqlType] (c: ast.SqlNamedReqExpr[X]) = new ExprParser(c.name, implicitly[SqlType[X]], List(c.sql))
+  implicit def toParser [X:SqlType] (c: ast.SqlNamedReqExpr[X]) = new ExprParser(c.name, implicitly[SqlType[X]], List(new query.SqlFragmentS(c.sql, c.params)))
   implicit def toParser2 [X:SqlType] (c: ast.SqlNonNullableCol[X]) = new ExprParser(c.name, implicitly[SqlType[X]], List(c.sql + " as " + c.name))
-  implicit def toOptParser [X:SqlType] (c: ast.SqlNamedOptExpr[X]) = new OptionalExprParser(c.name, implicitly[SqlType[X]], List(c.sql))
+  implicit def toOptParser [X:SqlType] (c: ast.SqlNamedOptExpr[X]) = new OptionalExprParser(c.name, implicitly[SqlType[X]], List(new query.SqlFragmentS(c.sql, c.params)))
   implicit def toOptParser2 [X:SqlType] (c: ast.SqlNullableCol[X]) = new OptionalExprParser(c.name, implicitly[SqlType[X]], List(c.sql + " as " + c.name))
   
   private[scoop] def renderParams (params: Seq[SqlParam[_]]) = params.map(x => x.v + ":"+x.v.asInstanceOf[AnyRef].getClass.getName.stripPrefix("java.lang."))
@@ -59,14 +59,14 @@ private [scoop] sealed trait ParseResult[+T] {
 private [scoop] case class ParseSuccess [T] (v: T) extends ParseResult[T]
 private [scoop] case class ParseFailure (error: String) extends ParseResult[Nothing]
 
-class ExprParser [+T] (name: String, exp: SqlType[T], sql: List[String]) // sql should probably be Option
+class ExprParser [+T] (name: String, exp: SqlType[T], sql: List[query.SqlFragmentS]) // sql should probably be Option
     extends boilerplate.ParserBase[T] (rs => exp.parse(rs, name) map {ParseSuccess(_)} getOrElse ParseFailure("Could not parse expression: " + name + " [" + exp + "] from " + util.inspectRS(rs))) {
-  def columns = sql map (x => x/*+" as "+name*/: query.SelectExprS)
+  def columns = sql map (x => x: query.SelectExprS)
 }
 
-class OptionalExprParser [+T] (name: String, exp: SqlType[T], sql: List[String]) 
+class OptionalExprParser [+T] (name: String, exp: SqlType[T], sql: List[query.SqlFragmentS]) 
     extends boilerplate.ParserBase[Option[T]] (rs => Some(exp.parse(rs, name)) map {ParseSuccess(_)} getOrElse ParseFailure("Could not parse expression: " + name + " [" + exp + "] from " + util.inspectRS(rs))) {
-  def columns = sql map (x => x/*+" as "+name*/: query.SelectExprS)
+  def columns = sql map (x => x: query.SelectExprS)
 }
 
 trait SqlType [T] {self =>

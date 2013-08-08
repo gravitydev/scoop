@@ -152,7 +152,7 @@ case class SqlRawExpr [X : SqlType] (sql: String, params: Seq[SqlParam[_]] = Nil
 
 abstract class SqlTable [T <: SqlTable[T]](_companion: TableCompanion[T], tableName: String = null, schema: String = null) {self: T =>
   // hmm... this is a bit brittle, but it *is* convenient
-  val _tableName = Option(tableName) getOrElse _companion.getClass.getName.split('.').last.split('$').last
+  val _tableName: String = Option(tableName) getOrElse _companion.getClass.getName.split('.').last.split('$').last
 
   val _schema = Option(schema)
   
