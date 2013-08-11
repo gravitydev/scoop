@@ -156,6 +156,9 @@ sealed trait InsertBase {
   } catch {
     case e: java.sql.SQLException => throw new Exception("SQL Exception ["+e.getMessage+"] when executing query ["+sql+"] with parameters: ["+params+"]")
   }
+
+  // upsert
+  def onDuplicateKeyUpdate (assignments: AssignmentS*) = Upsert(this, assignments.map(_.sql).filter(_.nonEmpty).toList, assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params})
 }
 
 case class Insert (
@@ -177,6 +180,15 @@ case class Insert2 (
   def comment (c: String): Insert2 = copy(comment = Some(c))
   def params: Seq[SqlParam[_]] = assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params}
   def sql: String = "INSERT INTO " + into + " (" + assignments.map(_.col.columnName).mkString(", ") + ") VALUES (" + assignments.map(_.valueSql).mkString(", ") + ")"
+}
+
+case class Upsert (
+  insert: InsertBase,
+  assignments: List[String] = Nil,
+  updateParams: Seq[SqlParam[_]]  = Nil
+) extends InsertBase {
+  def sql = insert.sql + " ON DUPLICATE KEY UPDATE " + assignments.mkString(", ")
+  def params = insert.params ++ updateParams
 }
 
 // using a subselect
