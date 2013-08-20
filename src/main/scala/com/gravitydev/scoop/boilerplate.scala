@@ -25,6 +25,8 @@ object `package` {
   def tuple18 [A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R](a:A,b:B,c:C,d:D,e:E,f:F,g:G,h:H,i:I,j:J,k:K,l:L,m:M,n:N,o:O,p:P,q:Q,r:R) = (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r)
   def tuple19 [A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S](a:A,b:B,c:C,d:D,e:E,f:F,g:G,h:H,i:I,j:J,k:K,l:L,m:M,n:N,o:O,p:P,q:Q,r:R,s:S) = (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s)
   def tuple20 [A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T](a:A,b:B,c:C,d:D,e:E,f:F,g:G,h:H,i:I,j:J,k:K,l:L,m:M,n:N,o:O,p:P,q:Q,r:R,s:S,t:T) = (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t)
+  def tuple21[A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U](a:A,b:B,c:C,d:D,e:E,f:F,g:G,h:H,i:I,j:J,k:K,l:L,m:M,n:N,o:O,p:P,q:Q,r:R,s:S,t:T,u:U) = (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u)
+  def tuple22[A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V](a:A,b:B,c:C,d:D,e:E,f:F,g:G,h:H,i:I,j:J,k:K,l:L,m:M,n:N,o:O,p:P,q:Q,r:R,s:S,t:T,u:U,v:V) = (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v)
 
   private [boilerplate] type P[+T] = ResultSetParser[T]
 
@@ -195,7 +197,28 @@ class Parser19 [+A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q,R,S,T](pa:P[A], pb:P[B], pc:P[C
 class Parser20 [+A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q,R,S,T,U](pa:P[A], pb:P[B], pc:P[C], pd:P[D], pe:P[E], pf:P[F], pg:P[G], ph:P[H], pi:P[I], pj:P[J], pk:P[K], pl:P[L], pm:P[M], pn:P[N], po:P[O], pq:P[Q], pr:P[R], ps:P[S], pt:P[T], pu:P[U]) extends ParserX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q,R,S,T,U)]{
   def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pq,pr,ps,pt,pu)
   def >> [Z](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q,R,S,T,U)=>Z) = new CompoundParser(this, for (a<-pa; b<-pb; c<-pc; d<-pd; e<-pe; f<-pf; g<-pg; h<-ph; i<-pi; j<-pj; k<-pk; l<-pl; m<-pm; n<-pn; o<-po; q<-pq; r<-pr; s<-ps; t<-pt; u<-pu) yield fn(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,q,r,s,t,u))
-  //def ~ [X](px: P[X]) = new Parser20(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,po,pq,pr,ps,pt,px)
+  def ~ [X](px: P[X]) = new Parser21(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pq,pr,ps,pt,pu,px)
   def apply (rs: ResultSet) = >>(tuple20)(rs)
 }
 
+class Parser21 [+A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q,R,S,T,U,V](pa:P[A], pb:P[B], pc:P[C], pd:P[D], pe:P[E], pf:P[F], pg:P[G], ph:P[H], pi:P[I],
+  pj:P[J], pk:P[K], pl:P[L], pm:P[M], pn:P[N], po:P[O], pq:P[Q], pr:P[R], ps:P[S], pt:P[T], pu:P[U], pv: P[V]) extends
+ParserX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q,R,S,T,U,V)]{
+  def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pq,pr,ps,pt,pu,pv)
+  def >> [Z](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q,R,S,T,U,V)=>Z) = new CompoundParser(this, for (a<-pa; b<-pb; c<-pc; d<-pd; e<-pe; f<-pf;
+    g<-pg; h<-ph; i<-pi; j<-pj; k<-pk; l<-pl; m<-pm; n<-pn; o<-po; q<-pq; r<-pr; s<-ps; t<-pt; u<-pu; v<-pv) yield
+  fn(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,q,r,s,t,u,v))
+  //def ~ [X](px: P[X]) = new Parser20(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,po,pq,pr,ps,pt,px)
+  def apply (rs: ResultSet) = >>(tuple21)(rs)
+}
+
+class Parser22 [+A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q,R,S,T,U,V,W](pa:P[A], pb:P[B], pc:P[C], pd:P[D], pe:P[E], pf:P[F], pg:P[G], ph:P[H],
+  pi:P[I], pj:P[J], pk:P[K], pl:P[L], pm:P[M], pn:P[N], po:P[O], pq:P[Q], pr:P[R], ps:P[S], pt:P[T], pu:P[U], pv:P[V], pw:P[W]) extends
+ParserX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q,R,S,T,U,V,W)]{
+  def list = List(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pq,pr,ps,pt,pu,pv,pw)
+  def >> [Z](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q,R,S,T,U,V,W)=>Z) = new CompoundParser(this, for (a<-pa; b<-pb; c<-pc; d<-pd; e<-pe; f<-pf;
+    g<-pg; h<-ph; i<-pi; j<-pj; k<-pk; l<-pl; m<-pm; n<-pn; o<-po; q<-pq; r<-pr; s<-ps; t<-pt; u<-pu; v<-pv; w<-pw) yield
+  fn(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,q,r,s,t,u,v,w))
+  //def ~ [X](px: P[X]) = new Parser20(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,po,pq,pr,ps,pt,px)
+  def apply (rs: ResultSet) = >>(tuple22)(rs)
+}
