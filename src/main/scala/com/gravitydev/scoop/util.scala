@@ -11,6 +11,11 @@ object `package` {
     while(test) ret += block
     ret.toList
   }
+
+  def indent (s: String) = s.split("\n").map("  "+_).mkString("\n")
+
+  // if multi-line, indent
+  def formatSubExpr (s: String) = if (s contains "\n") "\n"+indent(s)+"\n" else s
   
   def using [T <: Closeable, R](closeable: T)(fn: T => R): R = 
     try fn(closeable) finally closeable.close()

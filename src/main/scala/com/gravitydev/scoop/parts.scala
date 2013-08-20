@@ -26,14 +26,29 @@ object SqlFragmentS {
   implicit def fromExpr (expr: ast.SqlExpr[_]) = new SqlFragmentS(expr.sql, expr.params)
 }
 
-class AliasedSqlFragmentS (sql: String, alias: String, params: Seq[SqlParam[_]] = Seq()) 
-  extends SqlS("(" + sql + ") as " + alias, params)
+class AliasedSqlFragmentS (_sql: String, alias: String, params: Seq[SqlParam[_]] = Seq()) 
+    extends SqlS("(" + util.formatSubExpr(_sql) + ") as " + alias, params) {
+ 
+  // generate a column alias
+  def apply [X:SqlType](column: String) = new ast.SqlRawExpr[X](alias+"."+column)
+  def apply [X:SqlType](col: ast.SqlNamedExpr[X]) = new ast.SqlRawExpr[X](alias+"."+col.name).as(col.name)
+
+  def apply [X:SqlType](col: ast.SqlNonNullableCol[X]) = new ast.BaseSqlExpr[X] with ast.SqlNamedReqExpr[X] {
+    def name = col.name
+    def sql = alias+"."+col.name
+    def params = col.params
+  }
+  def apply [X:SqlType](col: ast.SqlNullableCol[X]) = new ast.BaseSqlExpr[X] with ast.SqlNamedOptExpr[X] {
+    def name = col.name
+    def sql = alias+"."+col.name
+    def params = col.params
+  }
+
+  def on (pred: ast.SqlExpr[Boolean]) = Join(this.sql, pred.sql, params ++ pred.params)
+}
 
 // TODO: is this even necessary anymore?
-class ExprS (s: String, params: Seq[SqlParam[_]] = Seq()) extends SqlFragmentS(s, params) {
-  // TODO: remove this, it should be taken care of by AliasedSqlFragment
-  //def as (alias: String) = new SelectExprS(s + " as " + alias, params)
-}
+class ExprS (s: String, params: Seq[SqlParam[_]] = Seq()) extends SqlFragmentS(s, params) 
 object ExprS {
   implicit def fromString (s: String)       = new ExprS(s)
   implicit def fromCol (col: ast.SqlCol[_]) = new ExprS(col.sql)
@@ -45,10 +60,11 @@ object ExprS {
 class SelectExprS     (s: String, params: Seq[SqlParam[_]] = Nil) extends SqlS(s, params)
 object SelectExprS {
   implicit def fromString (s: String)           = new SelectExprS(s)
-  implicit def fromFragment (s: SqlFragmentS) = new SelectExprS(s.sql, s.params)
-  implicit def fromNamed (expr: ast.SqlNamedExpr[_]) = new SelectExprS(expr.sql + " as " + expr.name, expr.params)
+  implicit def fromFragment (s: SqlFragmentS)   = new SelectExprS(s.sql, s.params)
+  implicit def fromNamed (expr: ast.SqlNamedExpr[_]) = new SelectExprS(expr.sql, expr.params)
   implicit def fromExprS (expr: ExprS)          = new SelectExprS(expr.sql, expr.params)
   implicit def fromAliased (a: AliasedSqlFragmentS) = new SelectExprS(a.sql, a.params) 
+  implicit def fromCol (a: ast.SqlCol[_])       = new SelectExprS(a.sql + " as " + a.name, a.params)
 }
 
 class FromS           (s: String, params: Seq[SqlParam[_]] = Seq()) extends SqlS(s, params) 
@@ -56,6 +72,7 @@ object FromS {
   implicit def fromString (s: String) = new FromS(s)
   implicit def fromTable (t: ast.SqlTable[_]) = new FromS(t.sql)
   implicit def fromAliasSqlFragmentS (s: AliasedSqlFragmentS) = new FromS(s.sql, s.params)
+  implicit def fromNamedQueryExpr (q: ast.SqlNamedQueryExpr[_]) = new FromS(q.sql, q.params)
 }
 
 class UpdateQueryableS (s: String) extends SqlS(s)
