@@ -208,7 +208,7 @@ ParserX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q,R,S,T,U,V)]{
   def >> [Z](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q,R,S,T,U,V)=>Z) = new CompoundParser(this, for (a<-pa; b<-pb; c<-pc; d<-pd; e<-pe; f<-pf;
     g<-pg; h<-ph; i<-pi; j<-pj; k<-pk; l<-pl; m<-pm; n<-pn; o<-po; q<-pq; r<-pr; s<-ps; t<-pt; u<-pu; v<-pv) yield
   fn(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,q,r,s,t,u,v))
-  //def ~ [X](px: P[X]) = new Parser20(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,po,pq,pr,ps,pt,px)
+  def ~ [X](px: P[X]) = new Parser22(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pq,pr,ps,pt,pu,pv,px)
   def apply (rs: ResultSet) = >>(tuple21)(rs)
 }
 
