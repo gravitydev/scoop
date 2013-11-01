@@ -93,7 +93,7 @@ class ScoopSpec extends FlatSpec {
   "Upserts" should "work" in {
     using (tables.users) {u =>
       insertInto(u)
-        .set(u.id := 1, u.first_name := "Alvaro", u.last_name := "Carrasco")
+        .set(u.id := 1, u.first_name := "Alvaro", u.last_name := "Carrasco", u.email := "simplepic@gmail.com")
         .onDuplicateKeyUpdate(u.age := u.age + 2)()
     }
   }
