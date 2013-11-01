@@ -83,7 +83,7 @@ abstract class SqlNativeType[T] (val tpe: Int, get: (ResultSet, String) => T, _s
   }
   def parse (rs: ResultSet, name: String) = Option(get(rs, name)) filter {_ => !rs.wasNull}
 }
-abstract class SqlCustomType[T,N] (from: N => T, to: T => N)(implicit nt: SqlNativeType[N]) extends SqlType[T] {
+class SqlCustomType[T,N] (from: N => T, to: T => N)(implicit nt: SqlNativeType[N]) extends SqlType[T] {
   def tpe = nt.tpe
   def parse (rs: ResultSet, name: String) = nt.parse(rs, name) map from
   def set (stmt: PreparedStatement, idx: Int, value: T): Unit = nt.set(stmt, idx, to(value))

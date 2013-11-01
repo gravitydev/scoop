@@ -1,6 +1,10 @@
 import sbt._
 
 object ScoopPlugin extends Plugin {
-  val scoopify = TaskKey
+  val generate = TaskKey[Unit]("scoop-generate", "Generate scala code to interact with JDBC database.")
+
+  val generateTask = generate <<= {
+    println("scoop generate")
+  }
 }
 
