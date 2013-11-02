@@ -1,6 +1,6 @@
 import com.gravitydev.scoop._
 
-class users extends Table[users](users) {
+class users extends Table[users] (users) {
   val id          = col[Long]           ('id)
   val first_name  = col[String]         ('first_name)
   val last_name   = col[String]         ('last_name)

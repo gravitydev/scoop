@@ -1,16 +1,22 @@
 import com.gravitydev.scoop._, query._
 
-val query = using(issues, users as "reporter", users as "assignee") {(i, r, a) =>
+case class Issue(
+  id: Long, title: String, status: Status, 
+  reporter: User, 
+  assignee: Option[User]
+)
+case class User(id: Long, name: String)
+
+val issues: List[Issue] = using(issues, users, users) {(i, reporter, assignee) =>
   from(i)
-  .innerJoin(r on i.reporter_id === r.id)
-  .leftJoin(a on i.assigned_to === a.id)
-  .where(r.accountId isNotNull)
+  .innerJoin(reporter on i.reporter_id === reporter.id)
+  .leftJoin(assignee on i.assigned_to === assignee.id)
+  .where(i.status === Open && i.reported_at >= DateTime.now.minusDays(7))
   .orderBy(i.status desc, i.reason desc)
-  .select(
-    i.*,
-    r.first_name as "reporter",
-    a.first_name as "assignee",
-    "(SELECT COUNT(*) FROM stats WHERE stats.issue_id = " + i.id.sql + ") as total_stats"
+  .find(
+    i.id ~ i.status ~ i.reason ~ 
+    (reporter.id ~ reporter.name >> User.apply)
+    opt(assignee.id ~ assignee.name >> User.apply) >> Issue.apply
   )
 }
 
