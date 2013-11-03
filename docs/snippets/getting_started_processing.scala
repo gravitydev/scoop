@@ -10,7 +10,9 @@ val users: List[(Long,String)] =
 val users: List[String] =
   from(u)
     .find(
-      u.first_name ~ u.last_name ~ u.age >> {(first,last,age) => s"$first $last ($age)"}
+      u.first_name ~ u.last_name ~ u.age >> {(first,last,age) => 
+        s"$first $last ($age)"
+      }
     )
 
 // use a case classes
