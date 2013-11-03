@@ -10,3 +10,20 @@ val users = DB.withTransaction {implicit conn => // provided by play
   }
 }
 ...
+DB.withTransaction {implicit conn =>
+  // basic insert
+  val id: Option[Long] = 
+    insertInto(u)
+      .values(
+        u.first_name := "Alvaro",
+        u.last_name := "Carrasco",
+        u.age := 31 
+      )()
+
+  // basic update
+  update(u)
+    .set(u.first_name := "Alvaro", u.age := 31)
+    .where(u.id === 1L)() // note the extra parens
+
+}
+...

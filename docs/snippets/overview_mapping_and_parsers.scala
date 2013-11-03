@@ -10,7 +10,8 @@ case class User (
 )
 
 object Parsers {
-  // make sure the case class has the correct number and type of parameters
+  // make sure the case class has the correct number and 
+  // type of parameters
   def account (a: accounts) =
     a.id ~ a.name >> Account.apply
 
@@ -23,11 +24,9 @@ object Parsers {
 // the tables can be configured with aliases
 // this makes the definition of the parser general,
 // but the instantiation specific to the query and the aliases used
-val userParser = Parsers.user( users, accounts )
+val users: List[User] = using (tables.users, tables.accounts) {(u, a) =>
+  from(u)
+    .leftJoin(a on u.account_id === a.id)
+    .find(Parsers.user(u,a))
+}
 
-val query = from(users)
-  .leftJoin(accounts on employees.manager_id === managers.id)
-  .select(userParser.columns:_*)
-  .map(userParser)
-
-val res: Seq[User] = query(con)

@@ -20,6 +20,6 @@ class issues extends Table[issues] (issues) {
   val id          = col[Long]           ('id)
   val summary     = col[String]         ('summary)
   val reported_by = col[Long]           ('reported_by)
-  val assigned_to = col[Long]           ('assigned_to)
+  val assigned_to = col[Long]           ('assigned_to)  nullable
 }
 
