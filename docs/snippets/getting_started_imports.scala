@@ -1,0 +1,3 @@
+import com.gravitydev.scoop._, query._
+import my.code.data._ // import the data definition you created on the previous step
+...
