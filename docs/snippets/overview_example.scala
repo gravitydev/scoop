@@ -1,4 +1,4 @@
-val users = List[(Long, String, Long, String)]
+val users: List[(Long, String, Long, String)] =
   using (tables.users, tables.accounts, tables.users) {(u, a, m) =>
     from(u)
       .innerJoin(a on u.account_id === a.id)

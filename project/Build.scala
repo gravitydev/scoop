@@ -2,8 +2,7 @@ import sbt._
 import Keys._
 
 object ScoopBuild extends Build {
-  //val gravityRepo = "gravitydev" at "http://repos.gravitydev.com/app/repos/12"
-  val gravityRepo = "gravitydev" at "http://repo.devstack.io/ws/gravitydev/private"
+  val gravityRepo = "gravitydev" at "https://devstack.io/repo/gravitydev/public"
 
   lazy val root = Project(id = "scoop", base = file(".")).settings(
     organization  := "com.gravitydev",
