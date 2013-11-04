@@ -1,17 +1,21 @@
 package my.code.data
 
-implicit object issueStatusT extends SqlCustomType[IssueStatus, String] (
-  // String => IssueStatus
-  key => key match {
-    case "open"   => Open 
-    case "closed" => Closed
-  },
-  // IssueStatus => String
-  status => status match {
-    case Open   => "open"
-    case Closed => "closed"if (status == Open)
-  }
-)
+// place implicits on a package object so they get imported
+// when you do "import my.code.data._"
+object `package` {
+  implicit object issueStatusT extends SqlCustomType[IssueStatus, String] (
+    // String => IssueStatus
+    key => key match {
+      case "open"   => Open 
+      case "closed" => Closed
+    },
+    // IssueStatus => String
+    status => status match {
+      case Open   => "open"
+      case Closed => "closed"if (status == Open)
+    }
+  )
+}
 
 ...
 
