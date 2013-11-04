@@ -1,3 +1,5 @@
+package my.code.data
+
 import com.gravitydev.scoop._
 
 class users extends Table[users] (users) {
