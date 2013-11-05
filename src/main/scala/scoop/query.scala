@@ -15,10 +15,10 @@ object `package` extends LowerPriorityImplicit {
   implicit def fromExpr (expr: ast.SqlExpr[_]) = new ExprS(expr.sql, expr.params)
   
   implicit def intToLongExpr (a: SqlExpr[Int]): SqlExpr[Long] = new SqlWrappedExpr[Int,Long](a)(long)
-  implicit def baseToSqlLit [T](base: T)(implicit sqlType: SqlType[T]): SqlExpr[T] = SqlLiteralExpr(base)
+  implicit def baseToSqlLit [T](base: T)(implicit sqlType: SqlParamType[T]): SqlExpr[T] = SqlLiteralExpr(base)
   implicit def tableToWrapped [T <: SqlTable[_]] (t: T) = new TableWrapper(t)
-  implicit def optToSqlLit [T](base: Option[T])(implicit sqlType: SqlType[T]) = base map {x => SqlLiteralExpr(x)}
-  implicit def baseToParam [T](base: T)(implicit sqlType: SqlType[T]) = SqlSingleParam(base)
+  implicit def optToSqlLit [T](base: Option[T])(implicit sqlType: SqlParamType[T]) = base map {x => SqlLiteralExpr(x)}
+  implicit def baseToParam [T](base: T)(implicit sqlType: SqlParamType[T]) = SqlSingleParam(base)
 
   implicit def toJoin (s: String)         = new JoinS(s, Nil)
   implicit def toPredicate (s: String)    = new PredicateS(s, Nil)

@@ -1,14 +1,43 @@
 package com.gravitydev.scoop
 package ast
 
-import java.sql.ResultSet
+import java.sql.{ResultSet, PreparedStatement}
+
+trait SqlType[T]
+
+trait SqlParamType[T] extends SqlType[T] {
+  def set (stmt: PreparedStatement, idx: Int, value: T): Unit
+}
+
+trait SqlResultType[T] extends SqlType[T] {
+  def parse (rs: ResultSet, name: String): Option[T]
+}
+
+trait SqlMappedType [T] extends SqlParamType[T] with SqlResultType[T] {self =>
+  def tpe: Int // jdbc sql type
+  def apply (n: String, sql: String = "") = new ExprParser (n, this, List(sql))
+}
+  
+class SqlNativeType[T] (val tpe: Int, get: (ResultSet, String) => T, _set: (PreparedStatement, Int, T) => Unit) extends SqlMappedType [T] {
+  def set (stmt: PreparedStatement, idx: Int, value: T): Unit = {
+    if (value==null) stmt.setNull(idx, tpe)
+    else _set(stmt, idx, value)
+  }
+  def parse (rs: ResultSet, name: String) = Option(get(rs, name)) filter {_ => !rs.wasNull}
+}
+class SqlCustomType[T,N] (from: N => T, to: T => N)(implicit nt: SqlNativeType[N]) extends SqlMappedType[T] {
+  def tpe = nt.tpe
+  def parse (rs: ResultSet, name: String) = nt.parse(rs, name) map from
+  def set (stmt: PreparedStatement, idx: Int, value: T): Unit = nt.set(stmt, idx, to(value))
+}
+
 
 sealed trait Sql {
   def sql: String
 }
 
 sealed trait SqlExpr [X] extends Sql {self =>
-  implicit def tp: SqlType[X]
+  implicit def paramTpe: SqlParamType[X]
   
   def params: Seq[SqlParam[_]]
   
@@ -25,11 +54,11 @@ sealed trait SqlExpr [X] extends Sql {self =>
   def >=  (v: SqlExpr[X]) = SqlInfixExpr[Boolean](this, v, ">=")
   
   // it would be nice to have a view bound here
-  def in (v: Set[X])(implicit tp: SqlType[X]) = { // is the implicit needed here
+  def in (v: Set[X])(implicit tp: SqlParamType[X]) = { // is the implicit needed here
     SqlInfixExpr[Boolean](this, SqlLiteralSetExpr(v), "IN")
   }
   
-  def notIn (v: Set[X])(implicit tp: SqlType[X]) = {
+  def notIn (v: Set[X])(implicit tp: SqlParamType[X]) = {
     SqlInfixExpr[Boolean](this, SqlLiteralSetExpr(v), "NOT IN")
   }
  
@@ -84,12 +113,14 @@ case class SqlOrdering (expr: ast.SqlExpr[_], order: SqlOrder) {
   def params = expr.params
 }
 
-abstract class BaseSqlExpr [T : SqlType] extends SqlExpr[T] {
+/*
+abstract class BaseSqlExpr [T:SqlType] extends SqlExpr[T] {
   def tp = implicitly[SqlType[T]]
 }
+*/
 
 trait SqlNamedExpr [T] extends SqlExpr[T] {self =>
-  implicit def tp: SqlType[T]
+  implicit def tp: SqlMappedType[T]
   def name: String
   def sql: String
   def params: Seq[SqlParam[_]]
@@ -220,12 +251,13 @@ case class SqlUnaryExpr [L:SqlType,T:SqlType](l: SqlExpr[L], op: String, postfix
   def sql = "(" + (if (postfix) l.sql + " " + op else op + " " + l.sql) + ")"
 }
 
-case class SqlLiteralExpr [T:SqlType] (v: T) extends BaseSqlExpr[T] {
+case class SqlLiteralExpr [T:SqlParamType] (v: T) extends BaseSqlExpr[T] {
   override def params = List(SqlSingleParam(v))
   def sql = "?"
 }
 
-case class SqlLiteralSetExpr [T:SqlType] (v: Set[T]) extends BaseSqlExpr[Set[T]] {
+case class SqlLiteralSetExpr [T:SqlParamType] (v: Set[T]) extends SqlExpr[Set[T]] {
+  def tp = implicitly[SqlParamType[Set[T]]]
   override def params = SqlSetParam(v).toList
   def sql = v.toList.map(_ => "?").mkString("(", ", ", ")")
 }
