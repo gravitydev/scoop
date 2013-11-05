@@ -54,9 +54,7 @@ sealed trait SqlExpr [X] extends Sql {self =>
   def >=  (v: SqlExpr[X]) = SqlInfixExpr[Boolean](this, v, ">=")
   
   // it would be nice to have a view bound here
-  def in (v: Set[X])(implicit tp: SqlParamType[X]) = { // is the implicit needed here
-    SqlInfixExpr[Boolean](this, SqlLiteralSetExpr(v), "IN")
-  }
+  def in (v: Set[X]) = SqlInfixExpr[Boolean](this, SqlLiteralSetExpr(v), "IN")
   
   def notIn (v: Set[X])(implicit tp: SqlParamType[X]) = {
     SqlInfixExpr[Boolean](this, SqlLiteralSetExpr(v), "NOT IN")

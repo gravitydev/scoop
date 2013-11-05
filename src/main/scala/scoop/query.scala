@@ -13,8 +13,10 @@ object `package` extends LowerPriorityImplicit {
   
   implicit def stringToFragment (s: String) = new SqlFragmentS(s, Seq())
   implicit def fromExpr (expr: ast.SqlExpr[_]) = new ExprS(expr.sql, expr.params)
-  
+ 
+  // kind of hacky 
   implicit def intToLongExpr (a: SqlExpr[Int]): SqlExpr[Long] = new SqlWrappedExpr[Int,Long](a)(long)
+
   implicit def baseToSqlLit [T](base: T)(implicit sqlType: SqlParamType[T]): SqlExpr[T] = SqlLiteralExpr(base)
   implicit def tableToWrapped [T <: SqlTable[_]] (t: T) = new TableWrapper(t)
   implicit def optToSqlLit [T](base: Option[T])(implicit sqlType: SqlParamType[T]) = base map {x => SqlLiteralExpr(x)}
