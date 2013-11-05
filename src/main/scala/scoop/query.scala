@@ -40,8 +40,8 @@ object `package` extends LowerPriorityImplicit {
 
   // query util
 
-  def exists [T:SqlType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "EXISTS", postfix=false)
-  def notExists [T:SqlType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "NOT EXISTS", postfix=false) 
+  def exists [T:SqlMappedType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "EXISTS", postfix=false)
+  def notExists [T:SqlMappedType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "NOT EXISTS", postfix=false) 
 
   // starting point
   def from (table: FromS) = Query(Some(table.sql)).copy(fromParams = table.params)
@@ -51,9 +51,9 @@ object `package` extends LowerPriorityImplicit {
   def update (table: UpdateQueryableS) = new UpdateBuilder(table)
   def deleteFrom (table: UpdateQueryableS) = new DeleteBuilder(table)
 
-  def sql [T:SqlType] (sql: String): SqlRawExpr[T] = new SqlRawExpr[T](sql, Nil)
-  def sql [T:SqlType] (sql: SqlS): SqlRawExpr[T] = new SqlRawExpr[T](sql.sql, sql.params)
-  def subquery [T:SqlType] (q: QueryS) = sql[T]("(" +~ q +~ ")")
+  def sql [T:SqlParamType] (sql: String): SqlRawExpr[T] = new SqlRawExpr[T](sql, Nil)
+  def sql [T:SqlParamType] (sql: SqlS): SqlRawExpr[T] = new SqlRawExpr[T](sql.sql, sql.params)
+  def subquery [T:SqlParamType] (q: QueryS) = sql[T]("(" +~ q +~ ")")
 
   // safe aliasing
   private class Aliaser {
@@ -260,7 +260,7 @@ case class Query (
 ) {
 
   // single expr, useful to have it typed
-  def select [T:SqlType](expr: SqlNamedExpr[T]): ast.SqlQueryExpr[T] = ast.SqlQueryExpr[T](select(expr: SelectExprS))
+  def select [T:SqlParamType](expr: SqlNamedExpr[T]): ast.SqlQueryExpr[T] = ast.SqlQueryExpr[T](select(expr: SelectExprS))
 
   def select (cols: SelectExprS*): Query = copy(sel = cols.map(_.sql).toList, selectParams = cols.map(_.params).flatten)
   def forUpdate ()            = copy(forUpdateLock = true)

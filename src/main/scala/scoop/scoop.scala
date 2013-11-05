@@ -10,6 +10,7 @@ object `package` {
   type SqlType[T] = ast.SqlMappedType[T]
 
   type SqlNativeType[T] = ast.SqlNativeType[T]
+  type SqlCustomType[I,O] = ast.SqlCustomType[I,O]
 
   implicit val int        = new SqlNativeType [Int]          (Types.INTEGER,   _ getInt _,       _ setInt (_,_))  
   implicit val long       = new SqlNativeType [Long]         (Types.BIGINT,    _ getLong _,      _ setLong (_,_))
