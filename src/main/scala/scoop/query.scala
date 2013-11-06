@@ -3,56 +3,49 @@ package query
 
 import java.sql.{Connection, Date, Timestamp, ResultSet}
 import scala.collection.mutable.ListBuffer
-import collection._, ast._
+import collection._, 
+  parsers.{ParseResult, ParseSuccess, ParseFailure, ResultSetParser},
+  ast.{SqlAssignment, SqlParamType, SqlLiteralExpr, SqlCol, SqlRawExpr, SqlWrappedExpr, SqlNamedExpr}
 
-trait LowerPriorityImplicit {
-}
-
-object `package` extends LowerPriorityImplicit {
+object `package` {
+  @deprecated("Use SqlExpr[Boolean]", "0.1.23-SNAPSHOT")
   type Predicate = ast.SqlExpr[Boolean]
   
   implicit def stringToFragment (s: String) = new SqlFragmentS(s, Seq())
-  implicit def fromExpr (expr: ast.SqlExpr[_]) = new ExprS(expr.sql, expr.params)
  
   // kind of hacky 
   implicit def intToLongExpr (a: SqlExpr[Int]): SqlExpr[Long] = new SqlWrappedExpr[Int,Long](a)(long)
 
+  implicit def fragmentToQueryS (s: SqlFragmentS) = new QueryS(s.sql, s.params)
+
   implicit def baseToSqlLit [T](base: T)(implicit sqlType: SqlParamType[T]): SqlExpr[T] = SqlLiteralExpr(base)
-  implicit def tableToWrapped [T <: SqlTable[_]] (t: T) = new TableWrapper(t)
+  implicit def tableToWrapped [T <: Table[_]] (t: T) = new TableOps(t)
   implicit def optToSqlLit [T](base: Option[T])(implicit sqlType: SqlParamType[T]) = base map {x => SqlLiteralExpr(x)}
   implicit def baseToParam [T](base: T)(implicit sqlType: SqlParamType[T]) = SqlSingleParam(base)
 
-  implicit def toJoin (s: String)         = new JoinS(s, Nil)
-  implicit def toPredicate (s: String)    = new PredicateS(s, Nil)
-  implicit def fragmentToQueryS (s: SqlFragmentS) = new QueryS(s.sql, s.params)
-  implicit def querySToPredicate (p: QueryS) = new PredicateS(p.sql, p.params)
-  implicit def toOrder (s: String)        = new OrderByS(s, Nil)
-  
-  implicit def tableToUpdate(t: SqlTable[_])      = new UpdateQueryableS(t.sql)
-  implicit def joinToJoin (j: Join)               = new JoinS(j.sql, j.params)
-  implicit def predToPredicateS (pred: SqlExpr[Boolean]) = new PredicateS(pred.sql, pred.params)
   implicit def assignmentToAssignmentS (a: SqlAssignment[_]) = new AssignmentS(a.sql, a.params)
   implicit def optionalAssignmentToAssignmentS (a: Option[SqlAssignment[_]]) = a map assignmentToAssignmentS getOrElse new AssignmentS("",Nil)
   implicit def queryToQueryS (q: Query)           = new QueryS(q.sql, q.params)
   
-  implicit def listToExpr (l: List[String]) = l.map(x => x: ExprS)
-  implicit def companionToTable [T <: ast.SqlTable[T]] (companion: {def apply (): T}): T = companion()
+  implicit def listToExpr (l: List[String]): List[ExprS] = l.map(x => x: ExprS)
+  implicit def companionToTable [T <: Table[T]] (companion: {def apply (): T}): T = companion()
 
-  // query util
-
-  def exists [T:SqlMappedType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "EXISTS", postfix=false)
-  def notExists [T:SqlMappedType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "NOT EXISTS", postfix=false) 
+  // should these be in the functions package?
+  def exists [T:SqlParamType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "EXISTS", postfix=false)
+  def notExists [T:SqlParamType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "NOT EXISTS", postfix=false) 
 
   // starting point
   def from (table: FromS) = Query(Some(table.sql)).copy(fromParams = table.params)
   def where (pred: PredicateS) = Query(None, predicate = Some(pred.sql), queryParams = pred.params)
   def select (cols: SelectExprS*): Query = Query(None, sel = cols.map(_.sql).toList, selectParams = cols.map(_.params).flatten)
-  def insertInto (table: SqlTable[_]) = new InsertBuilder(table._tableName)
+  def insertInto (table: Table[_]) = new InsertBuilder(table._tableName)
   def update (table: UpdateQueryableS) = new UpdateBuilder(table)
   def deleteFrom (table: UpdateQueryableS) = new DeleteBuilder(table)
 
   def sql [T:SqlParamType] (sql: String): SqlRawExpr[T] = new SqlRawExpr[T](sql, Nil)
   def sql [T:SqlParamType] (sql: SqlS): SqlRawExpr[T] = new SqlRawExpr[T](sql.sql, sql.params)
+  
+  // necessary anymore?
   def subquery [T:SqlParamType] (q: QueryS) = sql[T]("(" +~ q +~ ")")
 
   // safe aliasing
@@ -113,7 +106,7 @@ object `package` extends LowerPriorityImplicit {
   def using [R, A <: Table[A], B <: Table[B], C <: Table[C], D <: Table[D], E <: Table[E], F <: Table[F], G <: Table[G], H <: Table[H], I <: Table[I], J <: Table[J], K <: Table[K], L <: Table[L], M <: Table[M], N <: Table[N], O <: Table[O], P <: Table[P], Q <: Table[Q], S <: Table[S]](a: TC[A], b: TC[B], c: TC[C], d: TC[D], e: TC[E], f: TC[F], g: TC[G], h: TC[H], i: TC[I], j: TC[J], k: TC[K], l: TC[L], m: TC[M], n: TC[N], o: TC[O], p: TC[P], q: TC[Q], s: TC[S])(fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,S)=>R) = aliasing(x => fn(x(a), x(b), x(c), x(d), x(e), x(f), x(g), x(h), x(i), x(j), x(k), x(l), x(m), x(n), x(o), x(p), x(q), x(s)))
 }
 
-class TableWrapper [T <: SqlTable[_]](t: T) {
+class TableOps [T <: Table[_]](t: T) {
   def on (pred: SqlExpr[Boolean]) = Join(t.sql, pred.sql, pred.params)
 }
 
@@ -152,7 +145,7 @@ sealed trait InsertBase {
         rs.next()
         Some(rs.getLong(1))
       } catch {
-        case _ => None
+        case _:Throwable => None
       }
     }
   } catch {
@@ -242,24 +235,24 @@ case class Delete (
 }
 
 case class Query (
-  from:       Option[String],
-  sel:        List[String]    = List("*"),
-  joins:      List[String]    = Nil,
-  predicate:  Option[String]  = None,
-  order:      Option[String]  = None,
-  group:      List[String]    = Nil,
+  from:         Option[String],
+  sel:          List[String]    = List("*"),
+  joins:        List[String]    = Nil,
+  predicate:    Option[String]  = None,
+  order:        Option[String]  = None,
+  group:        List[String]    = Nil,
   selectParams: Seq[SqlParam[_]] = Nil,
-  fromParams: Seq[SqlParam[_]] = Nil,
-  queryParams: Seq[SqlParam[_]] = Nil,
+  fromParams:   Seq[SqlParam[_]] = Nil,
+  queryParams:  Seq[SqlParam[_]] = Nil,
   orderByParams: Seq[SqlParam[_]] = Nil,
-  limit:      Option[Int]     = None,
-  offset:     Option[Int]     = None,
-  comment:    Option[String]  = None,
-  distinct:   Boolean         = false,
-  forUpdateLock:  Boolean         = false
+  limit:        Option[Int]     = None,
+  offset:       Option[Int]     = None,
+  comment:      Option[String]  = None,
+  distinct:     Boolean         = false,
+  forUpdateLock: Boolean         = false
 ) {
 
-  // single expr, useful to have it typed
+  // single expr, useful to have it typed for subqueries
   def select [T:SqlParamType](expr: SqlNamedExpr[T]): ast.SqlQueryExpr[T] = ast.SqlQueryExpr[T](select(expr: SelectExprS))
 
   def select (cols: SelectExprS*): Query = copy(sel = cols.map(_.sql).toList, selectParams = cols.map(_.params).flatten)

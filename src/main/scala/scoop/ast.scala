@@ -2,6 +2,7 @@ package com.gravitydev.scoop
 package ast
 
 import java.sql.{PreparedStatement, ResultSet}
+import parsers.{ResultSetParser, ExprParser}
 
 trait SqlType[T]
 
@@ -15,7 +16,7 @@ trait SqlResultType[T] extends SqlType[T] {
 
 trait SqlMappedType [T] extends SqlParamType[T] with SqlResultType[T] {self =>
   def tpe: Int // jdbc sql type
-  def apply (n: String, sql: String = "") = new ExprParser (n, this, List(sql))
+  def apply (n: String, sql: String = "") = new ExprParser (n, List(sql))(this)
 }
   
 sealed trait Sql {
@@ -42,9 +43,7 @@ sealed trait SqlExpr [X] extends Sql {self =>
   // it would be nice to have a view bound here
   def in (v: Set[X]) = SqlInfixExpr[Boolean](this, SqlLiteralSetExpr(v), "IN")
   
-  def notIn (v: Set[X])(implicit tp: SqlParamType[X]) = {
-    SqlInfixExpr[Boolean](this, SqlLiteralSetExpr(v), "NOT IN")
-  }
+  def notIn (v: Set[X]) = SqlInfixExpr[Boolean](this, SqlLiteralSetExpr(v), "NOT IN")
  
   // should I get rid of these in favor of the symbolic ones?
   def and (v: SqlExpr[Boolean])(implicit ev: SqlExpr[X] =:= SqlExpr[Boolean]) = SqlInfixExpr[Boolean](ev(this), v, "AND")
@@ -204,7 +203,9 @@ abstract class SqlTable [T <: SqlTable[T]](_companion: TableCompanion[T], tableN
   def updateSql = _tableName
 }
 
-class SqlAssignment [T:SqlParamType](val col: SqlCol[T], value: SqlExpr[T]) extends BaseSqlExpr[Unit] {
+class SqlAssignment [T:SqlParamType](val col: SqlCol[T], value: SqlExpr[T]) extends SqlExpr[Unit] {
+  // hack
+  def paramTpe = null
   // assignments should have only the table name, never the alias
   def sql = col.columnName + " = " + valueSql
   def valueSql = value.sql + col.cast.map("::" + _).getOrElse("")

@@ -23,8 +23,7 @@ class ScoopSpec extends FlatSpec {
   
   "Implicits" should "work" in {
     using (tables.issues as "i") {i =>
-      val assignment = i.id := i.id + 1 // as "test"
-      //println(assignment)
+      (i.id := i.id + 1) should matchSql("id = (i.id + ?)", 1)
     }
   }
   
@@ -47,10 +46,8 @@ class ScoopSpec extends FlatSpec {
     select(coalesce(countDistinct(1), 0L) as "total", 4 as "num") should matchSql("SELECT COALESCE(COUNT(DISTINCT ?), ?) as total, ? as num", 1, 0, 4)
 
     using (tables.users as "u") {u =>
-      coalesce(u.id, 0L).as("v") should matchSql("COALESCE(u.id, ?) as v", 0L)
-      println(coalesce(u.id, 0L).as("v").columns)
-      from(u)
-        .find(coalesce(countDistinct(u.id), 0L).as("total"))
+      (coalesce(u.id, 0L) as "v") should matchSql("COALESCE(u.id, ?) as v", 0L)
+      from(u).find(coalesce(countDistinct(u.id), 0L).as("total")).head should be (1)
     }
   }
 
@@ -63,7 +60,7 @@ class ScoopSpec extends FlatSpec {
         )
         .select(u.id)
 
-      val q2 = from(u).find(from(u).limit(1).select(u.id) as "a")
+      from(u).find(from(u).limit(1).select(u.id) as "a") should be (List(1))
 
       /*
        * INSERT INTO cars (make, model)
@@ -130,7 +127,7 @@ class ScoopSpec extends FlatSpec {
   }
 
   "A subquery" should "work on the JOIN clause" in {
-    using(tables.users) {u =>
+    using (tables.users) {u =>
       // must define subquery first to obtain an alias
       val sub = from(u).where(u.id === 1).select(u.id) as "p"
 
@@ -161,21 +158,17 @@ class ScoopSpec extends FlatSpec {
 
   "A comparisons" should "work with literal types" in {
     using (tables.users) {u =>
-      val p1: Predicate = u.first_name === "somename"
-      val p2: Predicate = u.first_name like "somename"
-      val p3: Predicate = u.first_name in Set("one", "two")
+      val p1: SqlExpr[Boolean] = u.first_name === "somename"
+      val p2: SqlExpr[Boolean] = u.first_name like "somename"
+      val p3: SqlExpr[Boolean] = u.first_name in Set("one", "two")
     }
   }
 
-  // TODO: fix
-  /*
   "A string based subquery" should "work on the SELECT clause" in {
     using (tables.users) {u =>
-      from (u)
-        .find( sql[Boolean]("(SELECT ?)" %? 1) as "someBool" )
+      from(u).find( sql[Boolean]("(SELECT ?)" %? 1) as "someBool" ) should be (List(true))
     }
   }
-  */
 
   "A string-based subquery" should "work on the FROM clause" in {
     using (tables.users) {u =>
@@ -202,7 +195,7 @@ class ScoopSpec extends FlatSpec {
   "An assignment" should "allow expressions" in {
     using (tables.users) {u =>
       val q = update(u)
-        .set(u.age := u.age + (1:ast.SqlExpr[Int]))
+        .set(u.age := u.age + 1)
 
       q should matchSql("UPDATE users SET age = (users.age + ?)", 1)
     }

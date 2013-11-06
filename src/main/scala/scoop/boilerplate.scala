@@ -1,10 +1,10 @@
 package com.gravitydev.scoop
-package boilerplate
+package parsers
 
 import java.sql.ResultSet
 
 object `package` {
-  private [boilerplate] type P[+T] = ResultSetParser[T]
+  private [parsers] type P[+T] = ResultSetParser[T]
 }
 
 abstract class ParserBase [+A] (fn: ResultSet => ParseResult[A]) extends P[A] {
