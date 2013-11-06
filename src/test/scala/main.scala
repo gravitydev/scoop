@@ -241,6 +241,8 @@ class ScoopSpec extends FlatSpec {
   
     
     val userP = Parsers.user(u)
+
+    val comb = userP ~ i.id
  
     val issueParser = i.id ~ i.status ~ userP ~ opt(userP) ~ i.release_id >> Issue.apply
 

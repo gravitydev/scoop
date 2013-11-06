@@ -7,7 +7,7 @@ object ScoopBuild extends Build {
   lazy val root = Project(id = "scoop", base = file(".")).settings(
     organization  := "com.gravitydev",
     name          := "scoop",
-    version       := "0.1.22-SNAPSHOT",
+    version       := "0.2.0-type-cleanup2",
     crossScalaVersions := Seq("2.9.2", "2.10.0"),
     publishTo := Some(gravityRepo),
     libraryDependencies ++= Seq(

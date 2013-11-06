@@ -54,3 +54,8 @@ trait ResultSetParser[+T] extends (ResultSet => ParseResult[T]) {self =>
   def columns: List[query.SelectExprS]
 }
 
+class ParserWrapper[+T](parser: ResultSetParser[T]) {
+  def ~ [X](px: P[X]) = new Parser2(parser, px)
+  def >> [X](fn: T=>X) = new Parser1(parser map fn)
+}
+

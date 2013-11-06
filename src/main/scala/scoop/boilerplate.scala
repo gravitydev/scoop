@@ -11,7 +11,7 @@ abstract class ParserBase [+A] (fn: ResultSet => ParseResult[A]) extends P[A] {
   def ~ [X](px: P[X]) = new Parser2(this, px)
   def apply (rs: ResultSet) = fn(rs)
   def columns: List[query.SelectExprS]
-  def >> [T](fn: A=>T): P[T] = new Parser1(this map fn)
+  def >> [T](fn: A=>T) = new Parser1(this map fn)
   override def toString = "ParserBase(" + util.fnToString(fn) + ")"
 }
 

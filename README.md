@@ -9,7 +9,12 @@ Lots of inspiration was taken from squeryl, anorm, and the apocalisp blog.
 Installation
 ------------
 
-TODO: Maven Repository
+SBT:
+```sbt
+resolvers += "gravity" at "https://devstack.io/repo/gravitydev/public"
+
+libraryDependencies += "com.gravitydev" %% "scoop-0.2.0-SNAPSHOT"
+```
 
 Model Definition
 ----------------
@@ -20,23 +25,19 @@ Since the main purpose is to construct queries, the model definition should pret
 import com.gravitydev.scoop._
 
 class users extends Table[users](users) {
-  val id          = col[Long]           ("id")
-  val first_name  = col[String]         ("first_name")
-  val last_name   = col[String]         ("last_name")
-  val age         = col[Int]            ("age")
-  val nickname    = col[String]         ("nickname")    nullable
+  val id          = col[Long]           ('id)
+  val first_name  = col[String]         ('first_name)
+  val last_name   = col[String]         ('last_name)
+  val age         = col[Int]            ('age)
+  val nickname    = col[String]         ('nickname)    nullable
 }
 ```
 
 Query API 
 ---------
 
-*Somewhat usable* This API sacrifices some safety for flexibility and in some cases readability. It looks a bit more like SQL and you can 
+It looks a lot like SQL and you can 
 actually combine the model objects with custom query strings.
-
-The main differences compared with SQL:
- * You should define the aliases before hand so they are available throughout the query.
- * *select* is done last.
 
 ```scala
 import com.gravitydev.scoop._, query._
@@ -85,13 +86,9 @@ object Parsers {
 // instantiate a parser by specifying the tables it should use
 // the tables can be configured with aliases
 // this makes the definition of the parser general, but the instantiation custom to the query
-val userParser = Parsers.user( users, accounts )
-
-val query = from(users)
+val users = from(users)
   .leftJoin(accounts on employees.manager_id === managers.id)
-  .select(userParser.columns:_*)
-  .map(userParser)
+  .find(Parsers.user(users, accounts)
 
-val res: Seq[User] = query(con) 
 ```
 

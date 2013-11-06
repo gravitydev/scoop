@@ -37,6 +37,9 @@ object `package` {
       def columns = p.columns
     }
   }
+
+  // TODO: figure out how to not need this
+  implicit def wrapParser [T](parser: parsers.ResultSetParser[T]) = new parsers.ParserWrapper(parser)
   
   // TODO: clean up these hacks
   implicit def setT[X:ast.SqlParamType] = new SqlNativeType [Set[X]] (-1, (_,_) => sys.error("internal"), (_,_,_) => sys.error("internal"))
