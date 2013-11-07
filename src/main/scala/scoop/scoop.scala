@@ -2,7 +2,7 @@ package com.gravitydev.scoop
 
 import java.sql.{ResultSet, PreparedStatement, Types, Timestamp, Date}
 import ast.{SqlParamType, SqlResultType, SqlNamedReqExpr, SqlNamedOptExpr, SqlNonNullableCol, SqlNullableCol}
-import parsers.{ParseSuccess, ParseFailure, OptionalExprParser, ParserBase, ResultSetParser}
+import parsers.{ParseSuccess, ParseFailure, OptionalExprParser, ParserBase}
 
 object `package` {
   // aliases for convenience
@@ -13,7 +13,8 @@ object `package` {
   type SqlNativeType[T]   = ast.SqlNativeType[T]
   type SqlCustomType[I,O] = ast.SqlCustomType[I,O]
 
-  type ExprParser[T] = parsers.ExprParser[T]
+  type ExprParser[T]      = parsers.ExprParser[T]
+  type ResultSetParser[T] = parsers.ResultSetParser[T]
 
   @deprecated("Use ast.SqlMappedType if you need to (you shouldn't)", "0.1.23-SNAPSHOT")
   type SqlType[T] = ast.SqlMappedType[T]
