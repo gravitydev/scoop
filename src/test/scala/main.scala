@@ -103,6 +103,14 @@ class ScoopSpec extends FlatSpec with Matchers {
     }
   }
 
+  "Fragments" should "work anywhere on a query" in {
+    using (tables.users) {u =>
+      val ids: List[Long] = from("users u")
+        .where("u.id = ?" %? 1)
+        .find(long("id", sql="u.id" +~ ""))
+    }
+  }
+
   "A subquery" should "work on the FROM clause" in {
     using (tables.users) {u =>
       val sub = from(u).where(u.id === 1)

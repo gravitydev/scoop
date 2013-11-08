@@ -16,7 +16,7 @@ trait SqlResultType[T] extends SqlType[T] {
 
 trait SqlMappedType [T] extends SqlParamType[T] with SqlResultType[T] {self =>
   def tpe: Int // jdbc sql type
-  def apply (n: String, sql: String = "") = new ExprParser (n, List(sql))(this)
+  def apply (n: String, sql: query.SqlFragmentS = "") = new ExprParser (n, List(sql))(this)
 }
   
 sealed trait Sql {
@@ -28,10 +28,10 @@ sealed trait SqlExpr [X] extends Sql {self =>
   
   def params: Seq[SqlParam[_]]
   
-  def === (v: SqlExpr[X]) = SqlInfixExpr[Boolean](this, v, "=")
+  def === [Z](v: SqlExpr[Z]) = SqlInfixExpr[Boolean](this, v, "=")
 
-  def <> (v: SqlExpr[X]) = SqlInfixExpr[Boolean](this, v, "<>")
-  
+  def <> [Z](v: SqlExpr[Z]) = SqlInfixExpr[Boolean](this, v, "<>")
+ 
   // alias
   def |=| (v: SqlExpr[X]) = === (v)
   
@@ -65,7 +65,7 @@ sealed trait SqlExpr [X] extends Sql {self =>
   def * [T,N](v: SqlExpr[T])(implicit ev1: SqlExpr[X]=>SqlExpr[N], ev2: SqlExpr[T]=>SqlExpr[N], ev3: SqlParamType[N]) = SqlInfixExpr[N](this, v, "*")
   def / [T,N](v: SqlExpr[T])(implicit ev1: SqlExpr[X]=>SqlExpr[N], ev2: SqlExpr[T]=>SqlExpr[N], ev3: SqlParamType[N]) = SqlInfixExpr[N](this, v, "/")
   
-  def as (alias: String)(implicit t: SqlResultType[X]) = new SqlNamedReqExpr[X] (
+  def as (alias: String)(implicit ev: SqlResultType[X]) = new SqlNamedReqExpr[X] (
     name  = alias,
     sql   = sql + " as " + alias,
     params = params
