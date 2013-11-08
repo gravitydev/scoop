@@ -19,7 +19,7 @@ object SqlS {
  * A portion of a query that can be appended to another
  */
 sealed class SqlFragmentS (sql: String, params: Seq[SqlParam[_]] = Seq()) extends SqlS(sql,params) {
-  def +~ (s: SqlFragmentS) = new SqlFragmentS(sql + s.sql, params ++ s.params)
+  def +~ (s: SqlFragmentS): SqlFragmentS = new SqlFragmentS(sql + s.sql, params ++ s.params)
   def onParams (p: SqlParam[_]*) = new SqlFragmentS(sql, params ++ p.toSeq)
   def %? (p: SqlParam[_]*) = onParams(p:_*)
   def as (alias: String) = new AliasedSqlFragmentS(sql, alias, params)
@@ -70,7 +70,7 @@ object SelectExprS {
   implicit def fromCol (a: ast.SqlCol[_])       = new SelectExprS(a.sql + " as " + a.name, a.params)
 }
 
-class FromS           (s: String, params: Seq[SqlParam[_]] = Seq()) extends SqlS(s, params) 
+class FromS (s: String, params: Seq[SqlParam[_]] = Seq()) extends SqlS(s, params) 
 object FromS {
   implicit def fromString (s: String) = new FromS(s)
   implicit def fromTable (t: ast.SqlTable[_]) = new FromS(t.sql)

@@ -8,11 +8,11 @@ object ScoopBuild extends Build {
     organization  := "com.gravitydev",
     name          := "scoop",
     version       := "0.2.0-SNAPSHOT",
-    crossScalaVersions := Seq("2.9.2", "2.10.3"),
+    crossScalaVersions := Seq("2.10.3", "2.9.2"),
     publishTo := Some(gravityRepo),
     libraryDependencies ++= Seq(
-      "org.scalatest" %%  "scalatest"             % "1.8"     % "test" cross CrossVersion.full,
-      "mysql"         %   "mysql-connector-java"  % "5.1.18"  % "test"
+      "org.scalatest" % "scalatest_2.10" % "2.0" % "test",
+      "mysql"         % "mysql-connector-java"  % "5.1.18"  % "test"
     ),
     scalacOptions ++= Seq("-deprecation","-unchecked"/*,"-XX:-OmitStackTraceInFastThrow"*/),
     testOptions in Test += Tests.Argument("-oF")

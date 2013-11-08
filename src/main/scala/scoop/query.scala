@@ -4,7 +4,7 @@ package query
 import java.sql.{Connection, Date, Timestamp, ResultSet}
 import scala.collection.mutable.ListBuffer
 import collection._, 
-  parsers.{ParseResult, ParseSuccess, ParseFailure, ResultSetParser},
+  parsers.{ParseResult, ParseSuccess, ParseFailure},
   ast.{SqlAssignment, SqlParamType, SqlLiteralExpr, SqlCol, SqlRawExpr, SqlWrappedExpr, SqlNamedExpr}
 
 object `package` {
@@ -29,15 +29,16 @@ object `package` {
   
   implicit def listToExpr (l: List[String]): List[ExprS] = l.map(x => x: ExprS)
   implicit def companionToTable [T <: Table[T]] (companion: {def apply (): T}): T = companion()
+  implicit def sqlToFragment (s: SqlS) = new SqlFragmentS(s.sql, s.params)
 
   // should these be in the functions package?
   def exists [T:SqlParamType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "EXISTS", postfix=false)
   def notExists [T:SqlParamType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "NOT EXISTS", postfix=false) 
 
   // starting point
-  def from (table: FromS) = Query(Some(table.sql)).copy(fromParams = table.params)
-  def where (pred: PredicateS) = Query(None, predicate = Some(pred.sql), queryParams = pred.params)
-  def select (cols: SelectExprS*): Query = Query(None, sel = cols.map(_.sql).toList, selectParams = cols.map(_.params).flatten)
+  def from (table: FromS) = Query(Some(table))
+  def where (pred: PredicateS) = Query(None, predicate = Some(pred))
+  def select (cols: SelectExprS*): Query = Query(None, sel = cols.toList)
   def insertInto (table: Table[_]) = new InsertBuilder(table._tableName)
   def update (table: UpdateQueryableS) = new UpdateBuilder(table)
   def deleteFrom (table: UpdateQueryableS) = new DeleteBuilder(table)
@@ -235,59 +236,84 @@ case class Delete (
 }
 
 case class Query (
-  from:         Option[String],
-  sel:          List[String]    = List("*"),
-  joins:        List[String]    = Nil,
-  predicate:    Option[String]  = None,
-  order:        Option[String]  = None,
-  group:        List[String]    = Nil,
-  selectParams: Seq[SqlParam[_]] = Nil,
-  fromParams:   Seq[SqlParam[_]] = Nil,
-  queryParams:  Seq[SqlParam[_]] = Nil,
-  orderByParams: Seq[SqlParam[_]] = Nil,
-  limit:        Option[Int]     = None,
-  offset:       Option[Int]     = None,
-  comment:      Option[String]  = None,
-  distinct:     Boolean         = false,
-  forUpdateLock: Boolean         = false
+  from:         Option[SqlS],
+  sel:          List[SqlS]    = List("*"),
+  joins:        List[SqlS]    = Nil,
+  predicate:    Option[SqlS]  = None,
+  order:        Option[SqlS]  = None,
+  group:        List[SqlS]    = Nil,
+  limit:        Option[Int]           = None,
+  offset:       Option[Int]           = None,
+  comment:      Option[String]        = None,
+  distinct:     Boolean               = false,
+  forUpdateLock: Boolean              = false
 ) {
 
   // single expr, useful to have it typed for subqueries
   def select [T:SqlParamType](expr: SqlNamedExpr[T]): ast.SqlQueryExpr[T] = ast.SqlQueryExpr[T](select(expr: SelectExprS))
 
-  def select (cols: SelectExprS*): Query = copy(sel = cols.map(_.sql).toList, selectParams = cols.map(_.params).flatten)
+  def select (cols: SelectExprS*): Query = copy(sel = cols.toList)
   def forUpdate ()            = copy(forUpdateLock = true)
   def selectDistinct (cols: SelectExprS*) = copy(sel = cols.map(_.sql).toList, distinct=true)
-  def addCols (cols: ExprS*)  = copy(sel = sel ++ cols.map(_.sql).toList)
-  def innerJoin (join: JoinS) = copy(joins = joins ++ List("INNER JOIN " + join.sql), queryParams = this.queryParams ++ join.params )
-  def leftJoin (join: JoinS)  = copy(joins = joins ++ List("LEFT JOIN " + join.sql), queryParams = this.queryParams ++ join.params)
+  def addCols (cols: ExprS*)  = copy(sel = sel ++ cols.toList)
+  def innerJoin (join: JoinS) = copy(joins = joins ++ List("INNER JOIN " +~ join))
+  def leftJoin (join: JoinS)  = copy(joins = joins ++ List("LEFT JOIN " +~ join))
 
   // always append? we'll go with that for now
-  def where (pred: PredicateS) = copy(predicate = predicate.map(_ + " AND " + pred.sql).orElse(Some(pred.sql)), queryParams = this.queryParams ++ pred.params)
+  def where (pred: PredicateS) = copy(predicate = predicate.map(_ +~ " AND " +~ pred).orElse(Some(pred)))
 
-  def orderBy (order: OrderByS*) = copy(order = Some( (order.toList.map(_.sql)).mkString(", ")), orderByParams =
-    order.foldLeft(Seq[SqlParam[_]]())((a,b)
-    => a ++ b.params))
+  def orderBy (order: OrderByS*) = copy(
+    order = Some( 
+      order.toList.map(_.sql).mkString(", ") %? (order.foldLeft(Seq[SqlParam[_]]())((a,b) => a ++ b.params):_*)
+    )
+  )
   def groupBy (cols: ExprS*) = copy(group = cols.map(_.sql).toList)
   def limit (l: Int): Query = copy(limit = Some(l))
   def offset (o: Int): Query = copy(offset = Some(o))
   def comment (c: String): Query = copy(comment = Some(c))
   
-  def params: Seq[SqlParam[_]] = selectParams ++ fromParams ++ queryParams ++ orderByParams
-
   def as (alias: String) = new AliasedSqlFragmentS(sql, alias, params)
+
+  private def optSql(prefix: String, x: Option[SqlS]) = 
+    x map (prefix +~ _ +~ "\n") getOrElse ("" +~ "")
+
+  private def listSql (prefix: String, x: Seq[SqlS], delimiter: String = "") = 
+    ifStr(x.nonEmpty)(prefix) +~ x.reduceLeftOption(_ +~ delimiter +~ " \n" +~ _ +~ " \n").getOrElse("" +~ "") +~ " \n"
+
+  // Monoid append would be nice
+  private def ifStr (cond: Boolean)(subj: String) = (if (cond) subj else "")
+
+  private lazy val selectSql = listSql("SELECT " + ifStr(distinct)("DISTINCT"), sel, ",")
+
+  private lazy val fromSql = optSql("FROM ", from)
+
+  private lazy val joinsSql = listSql("", joins)
+
+  private lazy val whereSql = optSql("WHERE ", predicate)
+
+  private lazy val groupBySql = listSql("GROUP BY ", group)
+
+  private lazy val orderBySql = optSql("ORDER BY ", order)
+
+  private lazy val limitSql = optSql("LIMIT ", limit map (_.toString))
+
+  private lazy val offsetSql = optSql("OFFSET ", offset map (_.toString))
+
+  lazy val statement = 
+    comment.map(c => "/* " + c + "*/ \n").getOrElse("") +~
+    selectSql +~ 
+    fromSql +~
+    joinsSql +~
+    whereSql +~
+    groupBySql +~
+    orderBySql +~
+    limitSql +~
+    offsetSql +~
+    (ifStr(forUpdateLock)("FOR UPDATE \n"))
   
-  def sql: String = 
-    comment.map(c => "/* " + c + "*/ \n").getOrElse("") +
-    "SELECT " + (if (distinct) "DISTINCT " else "") + sel.mkString(", \n") + " \n" + 
-    from.map(f => "FROM " + f + "\n").getOrElse("") +
-    joins.mkString("", "\n", "\n") + 
-    predicate.map(w => "WHERE " + w + "\n").getOrElse("") + 
-    (if (group.nonEmpty) group.mkString("GROUP BY ", ", ", "\n") else "") +
-    order.map("ORDER BY " + _ + "\n").getOrElse("") +
-    limit.map("LIMIT " + _ + "\n").getOrElse("") +
-    offset.map("OFFSET " + _ + "\n").getOrElse("") + 
-    (if (forUpdateLock) "FOR UPDATE \n" else "")
+  lazy val sql = statement.sql
+
+  lazy val params = statement.params
  
   def map [B](process: ResultSet => ParseResult[B])(implicit c: Connection): List[B] = executeQuery(new QueryS(sql, params))(process)
 
