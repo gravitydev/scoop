@@ -267,7 +267,9 @@ case class Query (
       order.toList.map(_.sql).mkString(", ") %? (order.foldLeft(Seq[SqlParam[_]]())((a,b) => a ++ b.params):_*)
     )
   )
-  def groupBy (cols: ExprS*) = copy(group = cols.map(x => x:SqlFragmentS).toList)
+  def groupBy (cols: ExprS*) = copy(
+    group = cols.map(x => x:SqlFragmentS).toList
+  )
   def limit (l: Int): Query = copy(limit = Some(l))
   def offset (o: Int): Query = copy(offset = Some(o))
   def comment (c: String): Query = copy(comment = Some(c))
@@ -291,7 +293,7 @@ case class Query (
 
   private lazy val whereSql = optSql("WHERE ", predicate)
 
-  private lazy val groupBySql = listSql("GROUP BY ", group)
+  private lazy val groupBySql = listSql("GROUP BY ", group, ",")
 
   private lazy val orderBySql = optSql("ORDER BY ", order)
 

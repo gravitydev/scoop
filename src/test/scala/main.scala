@@ -199,6 +199,14 @@ class ScoopSpec extends FlatSpec with Matchers {
     }
   }
 
+  "Group By clause" should "work" in {
+    using (tables.users) {u =>
+      from(u)
+        .groupBy(u.first_name, functions.coalesce(u.age, 0))
+        .find(u.first_name ~ (functions.count(u.id) as "total"))
+    }
+  }
+
   "An assignment" should "allow expressions" in {
     using (tables.users) {u =>
       val q = update(u)
