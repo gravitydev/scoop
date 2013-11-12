@@ -88,7 +88,7 @@ object Parsers {
 // this makes the definition of the parser general, but the instantiation custom to the query
 val users = from(users)
   .leftJoin(accounts on employees.manager_id === managers.id)
-  .find(Parsers.user(users, accounts)
+  .find(Parsers.user(users, accounts))
 
 ```
 
