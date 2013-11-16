@@ -285,7 +285,7 @@ case class Query (
   // Monoid append would be nice
   private def ifStr (cond: Boolean)(subj: String) = (if (cond) subj else "")
 
-  private lazy val selectSql = listSql("SELECT " + ifStr(distinct)("DISTINCT"), sel, ",")
+  private lazy val selectSql = listSql("SELECT " + ifStr(distinct)("DISTINCT "), sel, ",")
 
   private lazy val fromSql = optSql("FROM ", from)
 
