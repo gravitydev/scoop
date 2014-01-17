@@ -1,9 +1,10 @@
-package com.gravitydev.scoop.util
+package com.gravitydev.scoop
+package util
 
 import scala.collection.mutable.ListBuffer
 import java.sql.{Connection, ResultSet}
 
-object `package` {
+private [scoop] object `package` {
   private type Closeable = {def close(): Unit}
   
   def bmap[T](test: => Boolean)(block: => T): List[T] = {
