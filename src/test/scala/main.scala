@@ -9,7 +9,7 @@ class ScoopSpec extends FlatSpec with Matchers {
 
   Class forName "com.mysql.jdbc.Driver"
   implicit lazy val con = java.sql.DriverManager.getConnection("jdbc:mysql://localhost/scoop_test", "root", "")
-  
+ 
   "Basic number operators" should "work" in {
     val num: ast.SqlExpr[Int] = 1 
     def s (exp: SelectExprS) = exp // force conversion
@@ -25,16 +25,16 @@ class ScoopSpec extends FlatSpec with Matchers {
       (i.id := i.id + 1) should matchSql("id = (i.id + ?)", 1)
     }
   }
-  
+ 
   "IS NOT NULL" should "work" in {
     using (tables.users) {u =>
-      from(u).where(u.data.isNotNull).find(u.data)
+      from(u).where(u.data.isNotNull).find(u.data).list
     }
   }
 
   "Parsers" should "work with aliased expressions" in {
     using (tables.users) {u =>
-      from(u).find(Parsers.total( functions.count(u.id) as "test" ))
+      from(u).find(Parsers.total( functions.count(u.id) as "test" )).list
     }
   }
   
@@ -59,7 +59,7 @@ class ScoopSpec extends FlatSpec with Matchers {
         )
         .select(u.id)
 
-      from(u).find(from(u).limit(1).select(u.id) as "a") should be (List(1))
+      from(u).find(from(u).limit(1).select(u.id) as "a").list should be (List(1))
 
       /*
        * INSERT INTO cars (make, model)
@@ -100,6 +100,7 @@ class ScoopSpec extends FlatSpec with Matchers {
         .where(u.id === 24L)
         .orderBy(u.id > 24L desc, u.id)
         .find(u.id)
+        .list
     }
   }
 
@@ -108,6 +109,7 @@ class ScoopSpec extends FlatSpec with Matchers {
       val ids: List[Long] = from("users u")
         .where("u.id = ?" %? 1)
         .find(long("id", sql="u.id" +~ ""))
+        .list
     }
   }
 
@@ -141,6 +143,7 @@ class ScoopSpec extends FlatSpec with Matchers {
       from(u)
         .innerJoin(sub on u.id === sub(u.id))
         .find(u.id ~ sub(u.id))
+        .list
     }
   }
 
@@ -173,7 +176,7 @@ class ScoopSpec extends FlatSpec with Matchers {
 
   "A string based subquery" should "work on the SELECT clause" in {
     using (tables.users) {u =>
-      from(u).find( sql[Boolean]("(SELECT ?)" %? 1) as "someBool" ) should be (List(true))
+      from(u).find( sql[Boolean]("(SELECT ?)" %? 1) as "someBool" ).list should be (List(true))
     }
   }
 
@@ -196,6 +199,7 @@ class ScoopSpec extends FlatSpec with Matchers {
 
       from( subq )
         .find( subq(u.id) )
+        .list
     }
   }
 
@@ -204,6 +208,7 @@ class ScoopSpec extends FlatSpec with Matchers {
       from(u)
         .groupBy(u.first_name, functions.coalesce(u.age, 0))
         .find(u.first_name ~ (functions.count(u.id) as "total"))
+        .list
     }
   }
 
@@ -229,6 +234,7 @@ class ScoopSpec extends FlatSpec with Matchers {
         .innerJoin(u on i.reported_by === u.id)
         .limit(10)
         .find(i.id)
+        .list
     }
 
     val res = using (tables.users as "hello") {u =>
@@ -236,6 +242,7 @@ class ScoopSpec extends FlatSpec with Matchers {
         .where(u.email === "")
         .limit(10)
         .find(u.first_name)
+        .list
     }
 
     val u = tables.users as "reporter"
@@ -327,9 +334,11 @@ class ScoopSpec extends FlatSpec with Matchers {
   }
 
   "utils" should "work" in {
+    /*
     util.processQuery("SELECT 1 as first, 2 as second, 'something' as ha") {rs =>
       //println(util.inspectRS(rs))
     }
+    */
   }
 }
 

@@ -2,7 +2,42 @@ package com.gravitydev.scoop
 package util
 
 import scala.collection.mutable.ListBuffer
-import java.sql.{Connection, ResultSet}
+import java.sql.{Connection, ResultSet, PreparedStatement}
+import parsers.{ParseResult, ParseSuccess, ParseFailure}
+
+private [scoop] class RsIterator[B](stmt: PreparedStatement, rowParser: ResultSet => ParseResult[B]) extends Iterator[B] {
+  val rs = stmt.executeQuery()
+  def hasNext: Boolean = {
+    if (rs.next()) true else {
+      rs.close()
+      stmt.close()
+      false
+    }
+  }
+  def next(): B = rowParser(rs) match {
+    case ParseSuccess(v) => v
+    case ParseFailure(e) => sys.error("Scoop Parse Error: " + e)
+  }
+}
+
+class QueryResult [T](iterator: Iterator[T]) {
+  def list = iterator.toList
+
+  /**
+   * Converts to a stream
+   * Be sure to consume the entire stream or ResultSet won't be closed
+   */
+  def stream = iterator.toStream
+
+  def set = iterator.toSet
+  def map [X] (fn: T=>X) = new QueryResult(iterator map fn)
+
+  // force evaluation
+  def head = iterator.toList.head
+  def headOption = iterator.toList.headOption
+  def isEmpty = iterator.toList.isEmpty
+  def foreach (fn: T => Unit) = list foreach fn
+}
 
 private [scoop] object `package` {
   private type Closeable = {def close(): Unit}

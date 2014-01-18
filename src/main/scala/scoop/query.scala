@@ -3,6 +3,7 @@ package query
 
 import java.sql.{Connection, Date, Timestamp, ResultSet}
 import scala.collection.mutable.ListBuffer
+import util.{RsIterator, QueryResult}
 import collection._, 
   parsers.{ParseResult, ParseSuccess, ParseFailure},
   ast.{SqlAssignment, SqlParamType, SqlLiteralExpr, SqlCol, SqlRawExpr, SqlWrappedExpr, SqlNamedExpr}
@@ -10,6 +11,10 @@ import collection._,
 object `package` {
   @deprecated("Use SqlExpr[Boolean]", "0.1.23-SNAPSHOT")
   type Predicate = ast.SqlExpr[Boolean]
+
+  // only here for backwards compat
+  @deprecated("Use .find(...).list to explicitly convert QueryResult[T] to List[T]", "0.3.0-SNAPSHOT")
+  implicit def queryResultToList [T](rs: util.QueryResult[T]) = rs.list
   
   implicit def stringToFragment (s: String) = new SqlFragmentS(s, Seq())
  
@@ -67,19 +72,12 @@ object `package` {
     
   private [this] def aliasing [T](fn: Aliaser => T) = fn(new Aliaser)
 
-  def executeQuery [B](query: QueryS)(process: ResultSet => ParseResult[B])(implicit c: Connection): List[B] = try {
-    util.using (c.prepareStatement(query.sql)) {statement =>
-      for ((p, idx) <- query.params.zipWithIndex) p(statement, idx+1)
-      
-      util.using (statement.executeQuery()) {results => 
-        util.bmap(results.next) { 
-          process(results) match {
-            case ParseSuccess(v) => v
-            case ParseFailure(e) => sys.error("Scoop Parse Error: " + e)
-          }
-        }
-      }
-    }
+  def executeQuery [B](query: QueryS)(rowParser: ResultSet => ParseResult[B])(implicit c: Connection): Iterator[B] = try {
+    val statement = c.prepareStatement(query.sql)
+    for ((p, idx) <- query.params.zipWithIndex) p(statement, idx+1)
+    
+    // iterator will close the ResultSet and the Statement
+    new RsIterator(statement, rowParser)
   } catch {
     case e: java.sql.SQLException => throw new Exception("SQL Exception ["+e.getMessage+"] when executing query ["+query.sql+"] with parameters: ["+query.params+"]")
   }
@@ -316,11 +314,14 @@ case class Query (
   lazy val sql = statement.sql
 
   lazy val params = statement.params
- 
-  def map [B](process: ResultSet => ParseResult[B])(implicit c: Connection): List[B] = executeQuery(new QueryS(sql, params))(process)
 
-  def find [B](parser: ResultSetParser[B])(implicit c: Connection): List[B] = select(parser.columns:_*) map parser 
-  def findDistinct [B](parser: ResultSetParser[B])(implicit c: Connection): List[B] = selectDistinct(parser.columns:_*) map parser 
+  @deprecated("Use process", "0.2.5-SNAPSHOT") 
+  def map [B](process: ResultSet => ParseResult[B])(implicit c: Connection): List[B] = executeQuery(new QueryS(sql, params))(process).toList
+
+  def process [B](rowParser: ResultSet => ParseResult[B])(implicit c: Connection): Iterator[B] = executeQuery(new QueryS(sql, params))(rowParser)
+
+  def find [B](parser: ResultSetParser[B])(implicit c: Connection): QueryResult[B] = new QueryResult(select(parser.columns:_*) process parser)
+  def findDistinct [B](parser: ResultSetParser[B])(implicit c: Connection): QueryResult[B] = new QueryResult(selectDistinct(parser.columns:_*) process parser)
 
   override def toString = {
     "Query(sql="+sql+", params=" + renderParams(params) +")"

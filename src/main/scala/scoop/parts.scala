@@ -112,7 +112,10 @@ class AssignmentS (s: String, params: Seq[SqlParam[_]]) extends SqlS(s, params)
  * TODO: Move this somewhere else
  */
 class QueryS (s: String, params: Seq[SqlParam[_]]) extends SqlFragmentS(s, params) {
-  def map [B](process: ResultSet => ParseResult[B])(implicit c: Connection): List[B] = executeQuery(this)(process)
+  @deprecated("Use process", "0.2.6-SNAPSHOT")
+  def map [B](process: ResultSet => ParseResult[B])(implicit c: Connection): List[B] = executeQuery(this)(process).toList
+
+  def process [B](rowParser: ResultSet => ParseResult[B])(implicit c: Connection): util.QueryResult[B] = new util.QueryResult(executeQuery(this)(rowParser))
   //def +~ (s: SqlS) = new QueryS(sql + s.sql, params ++ s.params)
   
   def executeUpdate ()(implicit c: Connection) = try util.using(c.prepareStatement(sql)) {stmt => 
@@ -121,7 +124,5 @@ class QueryS (s: String, params: Seq[SqlParam[_]]) extends SqlFragmentS(s, param
   } catch {
     case e: java.sql.SQLException => throw new Exception("SQL Exception ["+e.getMessage+"] when executing query ["+sql+"] with parameters: ["+params+"]")
   }
-}
-object QueryS {
 }
 
