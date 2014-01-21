@@ -5,12 +5,10 @@ import scala.collection.mutable.ListBuffer
 import java.sql.{Connection, ResultSet, PreparedStatement}
 import parsers.{ParseResult, ParseSuccess, ParseFailure}
 
-private [scoop] class RsIterator[B](stmt: PreparedStatement, rowParser: ResultSet => ParseResult[B]) extends Iterator[B] {
-  val rs = stmt.executeQuery()
+private [scoop] class ResultSetIterator[B](rs: ResultSet, rowParser: ResultSet => ParseResult[B], onComplete: => Unit) extends Iterator[B] {
   def hasNext: Boolean = {
     if (rs.next()) true else {
-      rs.close()
-      stmt.close()
+      onComplete
       false
     }
   }
@@ -56,18 +54,6 @@ private [scoop] object `package` {
   def using [T <: Closeable, R](closeable: T)(fn: T => R): R = 
     try fn(closeable) finally closeable.close()
     
-    
-  def processQuery [B](query: String)(fn: ResultSet => B)(implicit c: Connection): List[B] = {
-    val stmt = c.prepareStatement(query)
-    using (stmt) {statement =>
-      using (statement.executeQuery()) {results => 
-        bmap(results.next) { 
-          fn(results)
-        }
-      }
-    }
-  }
-
   def inspectRS (rs: ResultSet) = {
     val md = rs.getMetaData
     val count = md.getColumnCount()

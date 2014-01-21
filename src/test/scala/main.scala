@@ -333,12 +333,5 @@ class ScoopSpec extends FlatSpec with Matchers {
     
   }
 
-  "utils" should "work" in {
-    /*
-    util.processQuery("SELECT 1 as first, 2 as second, 'something' as ha") {rs =>
-      //println(util.inspectRS(rs))
-    }
-    */
-  }
 }
 

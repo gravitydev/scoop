@@ -74,10 +74,14 @@ object `package` {
 
   def executeQuery [B](query: QueryS)(rowParser: ResultSet => ParseResult[B])(implicit c: Connection): Iterator[B] = try {
     val statement = c.prepareStatement(query.sql)
+    val rs = statement.executeQuery()
     for ((p, idx) <- query.params.zipWithIndex) p(statement, idx+1)
     
     // iterator will close the ResultSet and the Statement
-    new RsIterator(statement, rowParser)
+    new ResultSetIterator(rs, rowParser, {
+      rs.close()
+      stmt.close()
+    })
   } catch {
     case e: java.sql.SQLException => throw new Exception("SQL Exception ["+e.getMessage+"] when executing query ["+query.sql+"] with parameters: ["+query.params+"]")
   }
