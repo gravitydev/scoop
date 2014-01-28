@@ -46,6 +46,7 @@ class ScoopSpec extends FlatSpec with Matchers {
 
     using (tables.users as "u") {u =>
       (coalesce(u.id, 0L) as "v") should matchSql("COALESCE(u.id, ?) as v", 0L)
+
       from(u).find(coalesce(countDistinct(u.id), 0L).as("total")).head should be (1)
     }
   }

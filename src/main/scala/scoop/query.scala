@@ -3,7 +3,7 @@ package query
 
 import java.sql.{Connection, Date, Timestamp, ResultSet}
 import scala.collection.mutable.ListBuffer
-import util.{RsIterator, QueryResult}
+import util.{ResultSetIterator, QueryResult}
 import collection._, 
   parsers.{ParseResult, ParseSuccess, ParseFailure},
   ast.{SqlAssignment, SqlParamType, SqlLiteralExpr, SqlCol, SqlRawExpr, SqlWrappedExpr, SqlNamedExpr}
@@ -74,13 +74,13 @@ object `package` {
 
   def executeQuery [B](query: QueryS)(rowParser: ResultSet => ParseResult[B])(implicit c: Connection): Iterator[B] = try {
     val statement = c.prepareStatement(query.sql)
-    val rs = statement.executeQuery()
     for ((p, idx) <- query.params.zipWithIndex) p(statement, idx+1)
+    val rs = statement.executeQuery()
     
     // iterator will close the ResultSet and the Statement
     new ResultSetIterator(rs, rowParser, {
       rs.close()
-      stmt.close()
+      statement.close()
     })
   } catch {
     case e: java.sql.SQLException => throw new Exception("SQL Exception ["+e.getMessage+"] when executing query ["+query.sql+"] with parameters: ["+query.params+"]")
