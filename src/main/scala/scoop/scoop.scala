@@ -30,10 +30,20 @@ object `package` {
   implicit val decimal    = new SqlNativeType [BigDecimal]   (Types.DECIMAL, (rs, idx) => BigDecimal(rs.getBigDecimal(idx)), (rs, idx, value) => rs.setBigDecimal(idx, value.underlying))
   implicit val anyref     = new SqlNativeType [AnyRef]       (Types.JAVA_OBJECT, _ getObject _, _ setObject(_,_))
 
+  // TODO: also provide the oposite, ParserBase[Option[T]] => ParserBase[T]
   def opt [T](p: ResultSetParser[T]): ParserBase[Option[T]] = {
     new ParserBase [Option[T]] (rs => p(rs) match {
       case ParseSuccess(s) => ParseSuccess(Option(s))
       case ParseFailure(e) => ParseSuccess(None)
+    }) {
+      def columns = p.columns
+    }
+  }
+
+  def req [T](p: ResultSetParser[Option[T]]): ParserBase[T] = {
+    new ParserBase[T] (rs => p(rs) match {
+      case ParseSuccess(s) => s map (v => ParseSuccess(v)) getOrElse ParseFailure("Could not parse value from parser: " + p)
+      case ParseFailure(_) => sys.error("Should never happen")
     }) {
       def columns = p.columns
     }
