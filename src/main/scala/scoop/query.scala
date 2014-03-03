@@ -4,13 +4,16 @@ package query
 import java.sql.{Connection, Date, Timestamp, ResultSet}
 import scala.collection.mutable.ListBuffer
 import util.{ResultSetIterator, QueryResult}
-import collection._, 
-  parsers.{ParseResult, ParseSuccess, ParseFailure},
-  ast.{SqlAssignment, SqlParamType, SqlLiteralExpr, SqlCol, SqlRawExpr, SqlWrappedExpr, SqlNamedExpr}
+import scala.collection._, 
+  ast.{SqlAssignment, SqlParamType, SqlResultType, SqlLiteralExpr, SqlCol, SqlRawExpr, SqlWrappedExpr, SqlNamedExpr, SqlRawParamExpr}
+
+class ColumnParser (name: String)
 
 object `package` {
   @deprecated("Use SqlExpr[Boolean]", "0.1.23-SNAPSHOT")
   type Predicate = ast.SqlExpr[Boolean]
+
+  //def col [T] (name: String) = new ColumnParser
 
   // only here for backwards compat
   @deprecated("Use .find(...).list to explicitly convert QueryResult[T] to List[T]", "0.3.0-SNAPSHOT")
@@ -19,7 +22,7 @@ object `package` {
   implicit def stringToFragment (s: String) = new SqlFragmentS(s, Seq())
  
   // kind of hacky 
-  implicit def intToLongExpr (a: SqlExpr[Int]): SqlExpr[Long] = new SqlWrappedExpr[Int,Long](a)(long)
+  implicit def intToLongExpr (a: SqlExpr[Int]): SqlExpr[Long] = new SqlWrappedExpr[Int,Long](a)(sqlLong)
 
   implicit def fragmentToQueryS (s: SqlFragmentS) = new QueryS(s.sql, s.params)
 
@@ -48,11 +51,11 @@ object `package` {
   def update (table: UpdateQueryableS) = new UpdateBuilder(table)
   def deleteFrom (table: UpdateQueryableS) = new DeleteBuilder(table)
 
-  def sql [T:SqlParamType] (sql: String): SqlRawExpr[T] = new SqlRawExpr[T](sql, Nil)
-  def sql [T:SqlParamType] (sql: SqlS): SqlRawExpr[T] = new SqlRawExpr[T](sql.sql, sql.params)
+  def sql [T:SqlParamType:SqlResultType] (sql: String): SqlExpr[T] = new SqlRawExpr[T](sql, Nil)
+  def sql [T:SqlParamType:SqlResultType] (sql: SqlS): SqlExpr[T] = new SqlRawExpr[T](sql.sql, sql.params)
   
   // necessary anymore?
-  def subquery [T:SqlParamType] (q: QueryS) = sql[T]("(" +~ q +~ ")")
+  def subquery [T:SqlParamType] (q: QueryS): SqlExpr[T] = new SqlRawParamExpr(s"(${q.sql})", q.params)
 
   // safe aliasing
   private class Aliaser {
@@ -169,7 +172,7 @@ case class Insert (
   def sql: String = "INSERT INTO " + into + " SET " + assignments.mkString(", ")
 }
 
-// alternate syntax
+// standard syntax
 case class Insert2 (
   into: String,
   assignments: List[SqlAssignment[_]],
@@ -179,6 +182,12 @@ case class Insert2 (
   def params: Seq[SqlParam[_]] = assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params}
   def sql: String = "INSERT INTO " + into + " (" + assignments.map(_.col.columnName).mkString(", ") + ") VALUES (" + assignments.map(_.valueSql).mkString(", ") + ")"
 }
+
+case class InsertBatch (
+  into: String,
+  values: List[List[String]],
+  comment: Option[String] = None
+)
 
 case class Upsert (
   insert: InsertBase,
@@ -319,13 +328,10 @@ case class Query (
 
   lazy val params = statement.params
 
-  @deprecated("Use process", "0.2.5-SNAPSHOT") 
-  def map [B](process: ResultSet => ParseResult[B])(implicit c: Connection): List[B] = executeQuery(new QueryS(sql, params))(process).toList
-
   def process [B](rowParser: ResultSet => ParseResult[B])(implicit c: Connection): Iterator[B] = executeQuery(new QueryS(sql, params))(rowParser)
 
-  def find [B](parser: ResultSetParser[B])(implicit c: Connection): QueryResult[B] = new QueryResult(select(parser.columns:_*) process parser)
-  def findDistinct [B](parser: ResultSetParser[B])(implicit c: Connection): QueryResult[B] = new QueryResult(selectDistinct(parser.columns:_*) process parser)
+  def find [B](selection: Selection[B])(implicit c: Connection): QueryResult[B] = new QueryResult(select(selection.expressions:_*) process selection)
+  def findDistinct [B](selection: Selection[B])(implicit c: Connection): QueryResult[B] = new QueryResult(selectDistinct(selection.expressions:_*) process selection)
 
   override def toString = {
     "Query(sql="+sql+", params=" + renderParams(params) +")"

@@ -3,7 +3,6 @@ package query
 
 import java.sql.{Connection, ResultSet}
 import ast.{SqlParamType, SqlResultType, SqlNamedReqExpr, SqlNamedOptExpr, SqlRawExpr, SqlNullableCol, SqlNonNullableCol}
-import parsers.ParseResult
 
 /**
  * A string portion of a query along with its parameters

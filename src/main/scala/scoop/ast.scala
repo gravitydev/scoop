@@ -3,20 +3,30 @@ package ast
 
 import java.sql.{PreparedStatement, ResultSet}
 import parsers.{ResultSetParser, ExprParser}
+import query.SqlS
 
 trait SqlType[T]
 
 trait SqlParamType[T] extends SqlType[T] {
   def set (stmt: PreparedStatement, idx: Int, value: T): Unit
 }
-
+object SqlParamType {
+  @inline def apply [T](implicit t: SqlParamType[T]) = t
+}
 trait SqlResultType[T] extends SqlType[T] {
   def parse (rs: ResultSet, name: String): Option[T]
+  def parse (rs: ResultSet, index: Int): Option[T]
+  def parseOr (rs: ResultSet, name: String, error: String): ParseResult[T] = parse(rs, name) map (x => Right(x)) getOrElse Left(error)
+  def parseOr (rs: ResultSet, index: Int, error: String): ParseResult[T] = parse(rs, index) map (x => Right(x)) getOrElse Left(error) 
+  def apply (name: String) = new ExprParser(name)(this)
+}
+object SqlResultType {
+  @inline def apply [T](implicit t: SqlResultType[T]) = t
 }
 
 trait SqlMappedType [T] extends SqlParamType[T] with SqlResultType[T] {self =>
   def tpe: Int // jdbc sql type
-  def apply (n: String, sql: query.SqlFragmentS = "") = new ExprParser (n, List(sql))(this)
+  //def apply (n: String, sql: query.SqlFragmentS = "") = new ExprParser (n, List(sql))(this)
 }
   
 sealed trait Sql {
@@ -78,20 +88,24 @@ sealed trait SqlExpr [X] extends Sql {self =>
   type ExprMapper[A,B,C] = SqlExpr[A] => SqlExpr[B] => SqlExpr[C]
 }
 
-abstract class BaseSqlExpr [T:SqlParamType] extends SqlExpr[T] {
-  def paramTpe = implicitly[SqlParamType[T]]
-}
-
-class SqlNativeType[T] (val tpe: Int, get: (ResultSet, String) => T, _set: (PreparedStatement, Int, T) => Unit) extends SqlMappedType [T] {
+class SqlNativeType[T] (
+  val tpe: Int, 
+  getByName: (ResultSet, String) => T,
+  getByIndex: (ResultSet, Int) => T,
+  _set: (PreparedStatement, Int, T) => Unit
+) extends SqlMappedType [T] {
   def set (stmt: PreparedStatement, idx: Int, value: T): Unit = {
     if (value==null) stmt.setNull(idx, tpe)
     else _set(stmt, idx, value)
   }
-  def parse (rs: ResultSet, name: String) = Option(get(rs, name)) filter {_ => !rs.wasNull}
+  def parse (rs: ResultSet, name: String) = Option(getByName(rs, name)) filter {_ => !rs.wasNull}
+  def parse (rs: ResultSet, idx: Int) = Option(getByIndex(rs, idx)) filter {_ => !rs.wasNull}
 }
+
 class SqlCustomType[T,N] (from: N => T, to: T => N)(implicit nt: SqlNativeType[N]) extends SqlMappedType[T] {
   def tpe = nt.tpe
   def parse (rs: ResultSet, name: String) = nt.parse(rs, name) map from
+  def parse (rs: ResultSet, idx: Int) = nt.parse(rs, idx) map from
   def set (stmt: PreparedStatement, idx: Int, value: T): Unit = nt.set(stmt, idx, to(value))
 }
 
@@ -99,7 +113,8 @@ object SqlExpr {
   implicit def intToSqlLongLit (base: Int): SqlExpr[Long] = SqlLiteralExpr(base: Long)
 }
 
-class SqlWrappedExpr [T,X:SqlParamType] (sqlExpr: SqlExpr[T]) extends BaseSqlExpr[X] {
+class SqlWrappedExpr [T,X:SqlParamType] (sqlExpr: SqlExpr[T]) extends SqlExpr[X] {
+  val paramTpe = SqlParamType[X]
   def params = sqlExpr.params
   def sql = sqlExpr.sql
 }
@@ -118,6 +133,8 @@ sealed trait SqlNamedExpr [T] extends SqlExpr[T] {self =>
   def name: String
   def sql: String
   def params: Seq[SqlParam[_]]
+
+  def expressions = List(new query.SelectExprS(sql, params))
 
   // this should only be applicable to sub-queries
   def apply [X:SqlMappedType](column: String) = new SqlRawExpr[X](name+"."+column)
@@ -144,22 +161,30 @@ object SqlNamedExpr {
   )(c.paramTpe, c.resultTpe)
 }
 
-class SqlNamedReqExpr [T:SqlParamType:SqlResultType] (val name: String, val sql: String, val params: Seq[SqlParam[_]]) extends BaseSqlExpr[T] with SqlNamedExpr[T] {self =>
-  val resultTpe = implicitly[SqlResultType[T]]
+class SqlNamedReqExpr [T:SqlParamType:SqlResultType] (val name: String, val sql: String, val params: Seq[SqlParam[_]]) 
+    extends SqlExpr[T] with SqlNamedExpr[T] with Selection[T] {self =>
+  val paramTpe = SqlParamType[T]
+  val resultTpe = SqlResultType[T]
   def as (alias: String) = new SqlNamedReqExpr [T] (alias, sql, params)
   def parse (rs: ResultSet) = implicitly[SqlResultType[T]].parse(rs, name)
+
+  def apply (rs: ResultSet) = parse(rs).toRight("Column [" + name + "] produced by [" + this + "] was not found in ResultSet: " + util.inspectRS(rs))
 }
 
-class SqlNamedOptExpr [T:SqlParamType:SqlResultType] (val name: String, val sql: String, val params: Seq[SqlParam[_]]) extends BaseSqlExpr[T] with SqlNamedExpr[T] {self =>
-  val resultTpe = implicitly[SqlResultType[T]]
+class SqlNamedOptExpr [T:SqlParamType:SqlResultType] (val name: String, val sql: String, val params: Seq[SqlParam[_]]) extends SqlExpr[T] with SqlNamedExpr[T] with Selection[Option[T]] {self =>
+  val paramTpe = SqlParamType[T]
+  val resultTpe = SqlResultType[T]
   def as (alias: String) = new SqlNamedOptExpr [T] (alias, sql, params)
   def parse (rs: ResultSet) = Some(resultTpe.parse(rs, name))
+
+  def apply (rs: ResultSet): ParseResult[Option[T]] = Right(parse(rs).get)
 }
 
 /**
  * Typed query with one column
  */
-case class SqlQueryExpr[T:SqlParamType] (query: com.gravitydev.scoop.query.Query) extends BaseSqlExpr[T] {
+case class SqlQueryExpr[T:SqlParamType] (query: com.gravitydev.scoop.query.Query) extends SqlExpr[T] {
+  def paramTpe = SqlParamType[T]
   override def sql = "(" + util.formatSubExpr(query.sql) + ")"
   def params = query.params
   override def as (name: String)(implicit t: SqlResultType[T]) = new SqlNamedQueryExpr[T](this, name)
@@ -168,7 +193,19 @@ case class SqlQueryExpr[T:SqlParamType] (query: com.gravitydev.scoop.query.Query
 class SqlNamedQueryExpr[T:SqlParamType:SqlResultType] (queryExpr: SqlQueryExpr[T], name: String) 
   extends SqlNamedReqExpr[T](name, queryExpr.sql + " as " + name, queryExpr.params)
 
-case class SqlRawExpr [X:SqlParamType] (sql: String, params: Seq[SqlParam[_]] = Nil) extends BaseSqlExpr[X]
+//case class SqlRawExpr [X:SqlParamType] (sql: String, params: Seq[SqlParam[_]] = Nil) extends BaseSqlExpr[X]
+
+private [scoop] class SqlRawParamExpr [X:SqlParamType] (val sql: String, val params: Seq[SqlParam[_]]) extends SqlExpr[X] {
+  def paramTpe = SqlParamType[X]
+}
+private [scoop] class SqlRawResultExpr [X:SqlResultType] (sqlExpr: query.SqlS) {
+  def sql = sqlExpr.sql
+  def params = sqlExpr.params
+}
+
+class SqlRawExpr[X:SqlParamType:SqlResultType] (val sql: String, val params: Seq[SqlParam[_]] = Nil) extends SqlExpr[X] {
+  val paramTpe = SqlParamType[X]
+}
 
 abstract class SqlTable [T <: SqlTable[T]](_companion: TableCompanion[T], tableName: String = null, schema: String = null) {self: T =>
   // hmm... this is a bit brittle, but it *is* convenient
@@ -197,7 +234,7 @@ abstract class SqlTable [T <: SqlTable[T]](_companion: TableCompanion[T], tableN
   def apply (): T = this
 
   // generate a column alias
-  def apply [X:SqlParamType](column: String) = new SqlRawExpr[X](_alias+"."+column)
+  def apply [X:SqlParamType:SqlResultType](column: String) = new SqlRawExpr[X](_alias+"."+column)
   
   def sql = if (_tableName == _alias) _tableName else _tableName + " as " + _alias
   def updateSql = _tableName
@@ -205,51 +242,74 @@ abstract class SqlTable [T <: SqlTable[T]](_companion: TableCompanion[T], tableN
 
 class SqlAssignment [T:SqlParamType](val col: SqlCol[T], value: SqlExpr[T]) extends SqlExpr[Unit] {
   // hack
-  def paramTpe = null
+  val paramTpe = null
   // assignments should have only the table name, never the alias
   def sql = col.columnName + " = " + valueSql
   def valueSql = value.sql + col.cast.map("::" + _).getOrElse("")
   override def params = value.params
 }
 
-case class SqlInfixExpr [T:SqlParamType](l: SqlExpr[_], r: SqlExpr[_], op: String) extends BaseSqlExpr[T] {
+case class SqlInfixExpr [T:SqlParamType](l: SqlExpr[_], r: SqlExpr[_], op: String) extends SqlExpr[T] {
+  val paramTpe = SqlParamType[T]
   def params = l.params ++ r.params
   def sql = "(" + l.sql + " " + op + " " + r.sql + ")"
   override def toString = "SqlInfixExpr(sql=" + sql + ", params=" + renderParams(params) + ")"
 }
 
-sealed abstract class SqlCol[T:SqlParamType:SqlResultType] (val cast: Option[String], table: SqlTable[_], alias: String = null) extends BaseSqlExpr[T] {
+/**
+ * @param name Name of the column to parse out of the ResultSet (might be an alias)
+ */
+sealed abstract class SqlCol[T:SqlParamType:SqlResultType] (val cast: Option[String], table: SqlTable[_], explicitAlias: String = null) extends SqlExpr[T] {
+  val paramTpe = SqlParamType[T]
+
   def columnName: String
-  def name: String = Option(alias) getOrElse (table._prefix + columnName)
+
+  def name: String = Option(explicitAlias) getOrElse table._prefix + columnName
+
   val params = Nil
+
   def sql = table._alias + "." + columnName + cast.map(_=>"::varchar").getOrElse("") // TODO: use correct base type
+
+  def expressions = List( new query.SelectExprS(sql + " as " + name) )
 }
 
-class SqlNonNullableCol[T:SqlMappedType](val columnName: String, cast: Option[String], table: SqlTable[_], alias: String = null) 
-    extends SqlCol[T] (cast, table, alias) {
-  val resultTpe = implicitly[SqlResultType[T]]
+class SqlNonNullableCol[T:SqlMappedType](val columnName: String, cast: Option[String], table: SqlTable[_], explicitAlias: String = null) 
+    extends SqlCol[T] (cast, table, explicitAlias) with Selection[T] {
+
+  val resultTpe = SqlResultType[T]
   override def toString = "Col(" + columnName + " as " + name + ")"
-  def nullable = new SqlNullableCol[T](columnName, cast, table)
+
+  def apply (rs: ResultSet) = resultTpe.parseOr(rs, name, s"Column [${name}] not found in ResultSet: ${util.inspectRS(rs)}")
+
+  def nullable = new SqlNullableCol[T](columnName, cast, table, explicitAlias)
   def := (x: SqlExpr[T]) = new SqlAssignment(this, x)
 }
 
-class SqlNullableCol[T:SqlMappedType](val columnName: String, cast: Option[String], table: SqlTable[_], alias: String = null) 
-    extends SqlCol[T] (cast, table, alias) {
+class SqlNullableCol[T:SqlMappedType](val columnName: String, cast: Option[String], table: SqlTable[_], explicitAlias: String) 
+    extends SqlCol[T] (cast, table, explicitAlias) with Selection[Option[T]] {
+
+  val resultTpe = SqlResultType[T]
   override def toString = "Col("+ columnName + " as " + name +" : Nullable)"
+
+  def apply (rs: ResultSet) = resultTpe.parse(rs, name) map (x => Right(Some(x))) getOrElse Right(None)
+
   def := (x: Option[SqlExpr[T]]) = new SqlAssignment(this, x getOrElse new SqlRawExpr[T]("NULL"))
 }
 
-case class SqlUnaryExpr [L:SqlParamType,T:SqlParamType](l: SqlExpr[L], op: String, postfix: Boolean) extends BaseSqlExpr [T] {
+case class SqlUnaryExpr [L:SqlParamType,T:SqlParamType](l: SqlExpr[L], op: String, postfix: Boolean) extends SqlExpr [T] {
+  val paramTpe = SqlParamType[T]
   def params = l.params
   def sql = "(" + (if (postfix) l.sql + " " + op else op + " " + l.sql) + ")"
 }
 
-case class SqlLiteralExpr [T:SqlParamType] (v: T) extends BaseSqlExpr[T] {
+case class SqlLiteralExpr [T:SqlParamType] (v: T) extends SqlExpr[T] {
+  val paramTpe = SqlParamType[T]
   override def params = List(SqlSingleParam(v))
   def sql = "?"
 }
 
-case class SqlLiteralSetExpr [T:SqlParamType] (v: Set[T]) extends BaseSqlExpr[Set[T]] {
+case class SqlLiteralSetExpr [T:SqlParamType] (v: Set[T]) extends SqlExpr[Set[T]] {
+  val paramTpe = SqlParamType[Set[T]]
   override def params = SqlSetParam(v).toList
   def sql = v.toList.map(_ => "?").mkString("(", ", ", ")")
 }

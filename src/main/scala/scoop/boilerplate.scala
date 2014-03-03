@@ -3,38 +3,74 @@ package parsers
 
 import java.sql.ResultSet
 
-object `package` {
-  private [parsers] type P[+T] = ResultSetParser[T]
+abstract class SelectionBase [+A] (fn: ResultSet => ParseResult[A]) extends S[A] {
+  def >> [T](fn: A=>T) = new Selection1(this map fn)
+  def ~ [X](px: S[X]): Selection2[A,X] = new Selection2(this, px)
+  def apply (rs: ResultSet): ParseResult[A] = fn(rs)
+  override def toString = "ParserBase(" + util.fnToString(fn) + ")"
 }
+
+abstract class SelectionX [+T] (val list: List[Selection[_]]) extends S[T] {
+  def expressions = list.foldLeft(List[query.SelectExprS]())((l,p) => l ++ p.expressions)
+  override def toString = list.map((x: AnyRef) => x.toString).mkString(" ~ ")
+}
+
+class Selection1 [+A](pa: S[A]) extends SelectionX[A] (List(pa)) {
+  def >> [T](fn: A=>T) = new Selection1(pa map fn)
+  def ~ [X](px: S[X]) = new Selection2(pa,px)
+  def apply (rs: ResultSet) = pa(rs)
+}
+class Selection2 [+A,B](pa:S[A],pb:S[B]) extends SelectionX[(A,B)] (List(pa,pb)) {
+  def >> [T](fn: (A,B)=>T) = map(fn.tupled)
+  def ~ [X](px: S[X]) = new Selection3(pa,pb,px)
+  def apply (rs: ResultSet) = (for (a<-pa;b<-pb) yield (a,b))(rs)
+}
+class Selection3 [+A,B,C](pa: S[A], pb: S[B], pc: S[C]) extends SelectionX[(A,B,C)] (List(pa,pb,pc)) {
+  def >> [T](fn: (A,B,C)=>T) = map(fn.tupled)
+  def ~ [X](px: S[X]) = new Selection4(pa,pb,pc,px)
+  def apply (rs: ResultSet) = (for (a<-pa; b<-pb; c<-pc) yield (a,b,c))(rs)
+}
+class Selection4 [+A,B,C,D](pa: S[A], pb: S[B], pc: S[C], pd: S[D]) extends SelectionX[(A,B,C,D)] (List(pa,pb,pc,pd)) {
+  def >> [T](fn: (A,B,C,D)=>T) = map(fn.tupled)
+  def ~ [X](px: S[X]) = new Selection5(pa,pb,pc,pd,px)
+  def apply (rs: ResultSet) = (for (a<-pa; b<-pb; c<-pc; d<-pd) yield (a,b,c,d))(rs)
+}
+class Selection5 [+A,B,C,D,E](pa: S[A], pb: S[B], pc: S[C], pd: S[D], pe: S[E]) extends SelectionX[(A,B,C,D,E)] (List(pa,pb,pc,pd,pe)) {
+  def >> [T](fn: (A,B,C,D,E)=>T) = map(fn.tupled)
+  //def ~ [X](px: P[X]) = new Parser6(pa,pb,pc,pd,pe,px)
+  def apply (rs: ResultSet) = (for (a<-pa; b<-pb; c<-pc; d<-pd; e<-pe) yield (a,b,c,d,e))(rs)
+}
+
+
 
 abstract class ParserBase [+A] (fn: ResultSet => ParseResult[A]) extends P[A] {
   def ~ [X](px: P[X]) = new Parser2(this, px)
   def apply (rs: ResultSet) = fn(rs)
-  def columns: List[query.SelectExprS]
-  def >> [T](fn: A=>T) = new Parser1(this map fn)
+  def >> [T](mfn: A=>T) = new Parser1(apply(_) map mfn)
   override def toString = "ParserBase(" + util.fnToString(fn) + ")"
 }
 
-abstract class ParserX [+T] extends ResultSetParser [T] {
+abstract class ParserX [+T] extends P[T] {
   def list: List[ResultSetParser[_]]
-  def columns = list.foldLeft(List[query.SelectExprS]())((l,p) => l ++ p.columns)
+  //def columns = list.foldLeft(List[query.SelectExprS]())((l,p) => l ++ p.columns)
   override def toString = list.map(_.toString).mkString(" ~ ")
 }
 
 class Parser1 [+A](pa: P[A]) extends ParserX[A] {
   def list = List(pa)
-  def >> [T](fn: A=>T) = new Parser1(pa map fn)
+  def >> [T](fn: A=>T) = new Parser1(pa(_) map fn)
   def ~ [X](px: P[X]) = new Parser2(pa,px)
   def apply (rs: ResultSet) = pa(rs)
 }
 
 class Parser2 [+A,B](pa: P[A], pb: P[B]) extends ParserX[(A,B)] {
   def list = List(pa,pb)
-  def >> [T](fn: (A,B)=>T) = map(fn.tupled)
-  def ~ [X](px: P[X]) = new Parser3(pa,pb,px)
-  def apply (rs: ResultSet) = (for (a <- pa; b <- pb) yield (a,b))(rs)
+  def >> [T](fn: (A,B)=>T) = (rs: ResultSet) => this(rs) map fn.tupled
+  //def ~ [X](px: P[X]) = new Parser3(pa,pb,px)
+  def apply (rs: ResultSet) = (for (a <- pa(rs); b <- pb(rs)) yield (a,b))
 }
 
+/*
 class Parser3 [+A,B,C](pa: P[A], pb: P[B], pc: P[C]) extends ParserX[(A,B,C)] {
   def list = List(pa,pb,pc)
   def >> [T](fn: (A,B,C)=>T) = map(fn.tupled)
@@ -178,3 +214,4 @@ ParserX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,Q,R,S,T,U,V,W)]{
   def apply (rs: ResultSet) = (for (a<-pa; b<-pb; c<-pc; d<-pd; e<-pe; f<-pf; g<-pg; h<-ph; i<-pi; j<-pj; k<-pk; l<-pl; m<-pm; n<-pn; o<-po; q<-pq; r<-pr; s<-ps; t<-pt; u<-pu; v<-pv; w<-pw) yield (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,q,r,s,t,u,v,w))(rs)
 }
 
+*/

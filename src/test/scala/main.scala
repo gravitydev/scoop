@@ -28,7 +28,10 @@ class ScoopSpec extends FlatSpec with Matchers {
  
   "IS NOT NULL" should "work" in {
     using (tables.users) {u =>
-      from(u).where(u.data.isNotNull).find(u.data).list
+      from(u)
+        .where(u.email.isNotNull)
+        .find(u.email)
+        .list
     }
   }
 
@@ -109,7 +112,7 @@ class ScoopSpec extends FlatSpec with Matchers {
     using (tables.users) {u =>
       val ids: List[Long] = from("users u")
         .where("u.id = ?" %? 1)
-        .find(long("id", sql="u.id" +~ ""))
+        .find(sql[Long]("u.id" +~ "").as("id"))
         .list
     }
   }
@@ -221,15 +224,15 @@ class ScoopSpec extends FlatSpec with Matchers {
       q should matchSql("UPDATE users SET age = (users.age + ?)", 1)
     }
   }
-  
-  "Query API" should "work" in {
-    val s = select("'hello'")
+
+  "Insert using select" should "work" in {
     using (tables.users) {u =>
       val insertQ = insertInto(u)(u.id, u.first_name).values(from(u).where(u.id === 24L).select(u.id, u.last_name))
     }
-    
-    val xx = decimal("SOMETHING", "SOMETHING2").columns
+  }
 
+
+  "Select single column from aliased tables" should "work" in {
     val ids = using (tables.users as "u", tables.issues as "i") {(u,i) =>
       from(i)
         .innerJoin(u on i.reported_by === u.id)
@@ -237,7 +240,9 @@ class ScoopSpec extends FlatSpec with Matchers {
         .find(i.id)
         .list
     }
+  }
 
+  "Select from aliased tables" should "work" in {
     val res = using (tables.users as "hello") {u =>
       val q = from(u)
         .where(u.email === "")
@@ -245,6 +250,11 @@ class ScoopSpec extends FlatSpec with Matchers {
         .find(u.first_name)
         .list
     }
+  }
+
+  "Random stuff" should "work" in {
+    val s = select("'hello'")
+    val xx = sql[scala.math.BigDecimal]("SOMETHING").as("SOMETHING2").expressions
 
     val u = tables.users as "reporter"
     val i = tables.issues as "i"
@@ -259,40 +269,65 @@ class ScoopSpec extends FlatSpec with Matchers {
 
     {
       val q = from(u).where("u.id IN (" +~ from(u).where(u.id === 2) +~ ")")
-    }    
+    }     
 
-  
-    
     val userP = Parsers.user(u)
 
     val comb = userP ~ i.id
  
-    val issueParser = i.id ~ i.status ~ userP ~ opt(userP) ~ i.release_id >> Issue.apply
-
-    //issueParser.columns map println
-
-    val xparser = i.id ~ userP ~ long("test", sql="(SELECT 1)")
+    val xparser = i.id ~ userP ~ sql[Long]("(SELECT 1)").as("test")
 
     val testParser = i.id ~ xparser
-
-    val qq = from(i) select(testParser.columns:_*) 
-
+    val qq = from(i) select(testParser.expressions:_*) 
     val qx = from(i).where(i.id |=| subquery[Long](qq))
     //println(qx)
-    
-    val num = "SELECT 1 as num FROM users WHERE 1 = ?" %? 1 map int("num") head;
+
+    val num = "SELECT 1 as num FROM users WHERE 1 = ?" %? 1 process sqlInt("num") head;
 
     val n = i.id |=| 24
  
+  }
+
+  "Explicit aliases" should "work" in {
+    
+    using (tables.issues as "i", tables.users as "reporter") {(i,u) =>
+      tables.issues._tableName  should be ("issues")
+      tables.issues.release_id.columnName should be ("release_id")
+      i.release_id.columnName   should be ("release_id")
+      i.release_id.name         should be ("i_release_id")
+
+      from(i)
+        .innerJoin (u on i.reported_by === u.id)
+        .orderBy (u.first_name desc, u.last_name asc)
+        .find(i.release_id)
+        .list
+    } 
+
+  }
+
+  "Query string" should "work in the WHERE clause" in {
+    val i = tables.issues as "i"
+    val u = tables.users as "reporter"
+
+    val userP = Parsers.user(u)
+
+    val issueParser = i.id ~ i.status ~ userP ~ opt(userP) ~ i.release_id >> Issue.apply
+
     val q = from(i)
       .innerJoin (u on i.reported_by === u.id)
       //.where (u.first_name === "alvaro" and i.status === IssueStatuses.Open and i.status === 24)
       .where("reporter.last_name = ?" %? "carrasco")
       .orderBy (u.first_name desc, u.last_name asc)
-
-
      
     q find issueParser
+    
+
+  }
+  
+  "Query API" should "work" in {
+    val u = tables.users as "reporter"
+    val i = tables.issues as "i"
+
     
     //val res = mapped(con)
     
@@ -330,7 +365,7 @@ class ScoopSpec extends FlatSpec with Matchers {
 
 
     val vx = from(i)
-      .select( (int("test", sql="1") >> {x => x}).columns:_* )
+      .select( (sql[Int]("1").as("test") >> {x => x}).expressions:_* )
     
   }
 

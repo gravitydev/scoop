@@ -3,7 +3,6 @@ package util
 
 import scala.collection.mutable.ListBuffer
 import java.sql.{Connection, ResultSet, PreparedStatement}
-import parsers.{ParseResult, ParseSuccess, ParseFailure}
 
 private [scoop] class ResultSetIterator[B](rs: ResultSet, rowParser: ResultSet => ParseResult[B], onComplete: => Unit) extends Iterator[B] {
   def hasNext: Boolean = {
@@ -13,8 +12,8 @@ private [scoop] class ResultSetIterator[B](rs: ResultSet, rowParser: ResultSet =
     }
   }
   def next(): B = rowParser(rs) match {
-    case ParseSuccess(v) => v
-    case ParseFailure(e) => sys.error("Scoop Parse Error: " + e)
+    case Right(v) => v
+    case Left(e) => sys.error("Scoop Parse Error: " + e)
   }
 }
 
