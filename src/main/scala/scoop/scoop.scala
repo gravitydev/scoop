@@ -1,8 +1,8 @@
 package com.gravitydev.scoop
 
 import java.sql.{ResultSet, PreparedStatement, Types, Timestamp, Date}
-import ast.{SqlParamType, SqlResultType, SqlNamedExpr, SqlNamedReqExpr, SqlNamedOptExpr, SqlNonNullableCol, SqlNullableCol}
-import parsers.{OptionalExprParser, ParserBase, SelectionBase}
+import ast.{SqlParamType, SqlResultType, SqlNamedExpr, SqlNonNullableCol, SqlNullableCol}
+import parsers.Selection1
 
 object `package` {
   // aliases for convenience
@@ -15,7 +15,6 @@ object `package` {
 
   type ExprParser[T]      = parsers.ExprParser[T]
   type ResultSetParser[T] = parsers.ResultSetParser[T]
-  //type Selection[T]       = parsers.Selection[T]
 
   type ParseResult[+T] = Either[String,T]
 
@@ -45,36 +44,26 @@ object `package` {
     _ setObject(_,_)
   )
 
+  def opt [T](p: Selection[T]): Selection1[Option[T]] = new Selection1 [Option[T]] (
+    rs => p(rs).fold(_ => Right(None), x => Right(Option apply x)), 
+    p.expressions
+  )
 
-  def opt [T](p: ResultSetParser[T]): ParserBase[Option[T]] = {
-    new ParserBase [Option[T]] (rs => p(rs).fold(_ => Right(None), x => Right(Option apply x))) {} // TODO: isn't there a concrete class for this?
-  }
-
-  def opt [T](p: Selection[T]): SelectionBase[Option[T]] = {
-    new SelectionBase [Option[T]] (rs => p(rs).fold(_ => Right(None), x => Right(Option apply x))) {
-      def expressions = p.expressions
-    }
-  }
-
-  def req [T](p: ResultSetParser[Option[T]]): ParserBase[T] = {
-    new ParserBase[T] (rs => p(rs) fold (
-      error => sys.error("Required value not found: " + error),
-      s => s map (v => Right(v)) getOrElse Left("Could not parse value from parser: " + p)
-    )) {} // TODO: concrete class here
-  }
-
-  def req [T](p: Selection[Option[T]]): SelectionBase[T] = {
-    new SelectionBase[T] (rs => p(rs) fold (
-      error => sys.error("Required value not found: " + error),
-      s => s map (v => Right(v)) getOrElse Left("Could not parse value from parser: " + p)
-    )) {
-      def expressions = p.expressions
-    }
+  def req [T](p: Selection[Option[T]]): Selection1[T] = {
+    new Selection1[T] (
+      rs => p(rs) fold (
+        error => sys.error("Required value not found: " + error),
+        s => s map (v => Right(v)) getOrElse Left("Could not parse value from selection: " + p)
+      ),
+      p.expressions
+    )
   }
 
   // TODO: figure out how to not need this
   //implicit def wrapParser [T](parser: parsers.ResultSetParser[T]) = new parsers.ParserWrapper(parser)
-  implicit def wrapSelection[T](selection: Selection[T]) = new parsers.Selection1(selection)
+  //implicit def wrapSelection[T](selection: Selection[T]) = new parsers.Selection1(selection)
+
+  //implicit def selectionFromParser [T](parser: ResultSetParser[T]): Selection1[T] = new Selection1 [T] (parser)
   
   // TODO: clean up these hacks
   implicit def setT[X:ast.SqlParamType] = new SqlNativeType [Set[X]] (
@@ -83,29 +72,16 @@ object `package` {
     (_,_) => sys.error("internal"), 
     (_,_,_) => sys.error("internal")
   )
- 
-  // TODO: handle params
 
-  //implicit def toParser [X:SqlResultType] (c: SqlNamedReqExpr[X]) = new ExprParser[X](c.name, List(new query.SqlFragmentS(c.sql, c.params)))
-  //implicit def toSqlReqNamedExpr [X:SqlParamType:SqlResultType] (c: SqlNamedReqExpr[X]) = new SqlNamedReqExpr[X](c.name, c.sql, c.params)
+  implicit def namedExprToSelection [X:SqlResultType] (expr: SqlNamedExpr[X]): Selection1[X] = new Selection1[X] (
+    rs => SqlResultType[X].parseOr(rs, expr.name, "Could not parse expression: " + expr.name + " [" + SqlResultType[X] + "] from " + util.inspectRS(rs)), 
+    List( new query.SelectExprS(expr.selectSql, expr.params) )
+  ) 
 
-  implicit def namedReqExprToSelection [X:SqlResultType] (expr: SqlNamedReqExpr[X]): Selection[X] = Selection.required[X](expr.name, expr.sql, expr.params)
-
-  //implicit def toParser2 [X:SqlResultType] (c: SqlNonNullableCol[X]) = new ExprParser[X](c.name, List(c.sql + " as " + c.name))
-  //implicit def toParser2 [X:SqlParamType:SqlResultType] (c: SqlNonNullableCol[X]): ResultSetParser[X] = new SqlNamedReqExpr[X](c.name, c.sql + " as " + c.name, c.params)
-
-  implicit def toOptParser [X:SqlResultType] (c: SqlNamedOptExpr[X]) = new OptionalExprParser[X](c.name, List(new query.SqlFragmentS(c.sql, c.params)))
-  implicit def toOptParser2 [X:SqlResultType] (c: SqlNullableCol[X]) = new OptionalExprParser[X](c.name, List(c.sql + " as " + c.name))
+  implicit def nonNullableColToSelection [X:SqlResultType] (col: SqlNonNullableCol[X]): Selection1[X] = new Selection1 (col, col.expressions)
+  implicit def nullableColToSelection [X:SqlResultType] (col: SqlNullableCol[X]): Selection1[Option[X]] = new Selection1 (col, col.expressions)
   
   private[scoop] def renderParams (params: Seq[SqlParam[_]]) = params.map(x => x.v + ":"+x.v.asInstanceOf[AnyRef].getClass.getName.stripPrefix("java.lang."))
-}
-
-object Selection {
-  def required [T:SqlResultType] (name: String, sql: String, params: Seq[SqlParam[_]]) = new SelectionBase[T] (
-    rs => SqlResultType[T].parseOr(rs, name, "Could not parse expression: " + name + " [" + SqlResultType[T] + "] from " + util.inspectRS(rs))
-  ) with Selection [T] {
-    lazy val expressions = List( new query.SelectExprS(sql + " as " + name, params) )
-  }
 }
 
 /**
@@ -115,7 +91,6 @@ trait Selection [+T] extends (ResultSet => ParseResult[T]) with parsers.ResultSe
   def map [X] (fn: T => X): Selection[X] = new parsers.MappedSelection(self, fn)
   def expressions: List[query.SelectExprS]
 }
-
 
 sealed trait SqlParam [T] {
   val v: T
@@ -132,7 +107,6 @@ case class SqlSetParam [T](v: Set[T])(implicit tp: ast.SqlParamType[T]) extends 
 }
 
 case class literal [T] (value: T) extends ResultSetParser [T] {
-  def columns = Nil
   def apply (rs: ResultSet) = Right(value)
 }
 

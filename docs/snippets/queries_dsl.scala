@@ -7,3 +7,4 @@ val users =
     .limit(...)
     .offset(...)
     .find(...)
+    .list // or head, headOption, etc

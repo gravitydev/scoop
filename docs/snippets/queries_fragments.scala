@@ -14,6 +14,6 @@ val users =
     .innerJoin(manager on employee.manager_id === manager.id)
     .where(
       userActive(manager) &&
-      userMatch(employee, "James")
+      userMatch(employee, "James%")
     )
     .find(...)

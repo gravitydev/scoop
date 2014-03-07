@@ -2,7 +2,7 @@ package com.gravitydev.scoop
 package query
 
 import java.sql.{Connection, ResultSet}
-import ast.{SqlParamType, SqlResultType, SqlNamedReqExpr, SqlNamedOptExpr, SqlRawExpr, SqlNullableCol, SqlNonNullableCol}
+import ast.{SqlParamType, SqlResultType, SqlNamedExpr, SqlNamedExprImpl, SqlRawExpr, SqlNullableCol, SqlNonNullableCol}
 
 /**
  * A string portion of a query along with its parameters
@@ -28,24 +28,21 @@ object SqlFragmentS {
 }
 
 class AliasedSqlFragmentS (_sql: String, alias: String, params: Seq[SqlParam[_]] = Seq()) 
-    extends SqlS("(" + util.formatSubExpr(_sql) + ") as " + alias, params) {
+    extends SqlS("(" + util.formatSubExpr(_sql) + ")", params) {
+
+  def selectSql = sql + " as " + alias
  
   // generate a column alias
   def apply [X:SqlParamType:SqlResultType](column: String) = new SqlRawExpr[X](alias+"."+column)
   def apply [X:SqlParamType:SqlResultType](col: ast.SqlNamedExpr[X]) = new ast.SqlRawExpr[X](alias+"."+col.name).as(col.name)
 
-  def apply [X:SqlResultType](col: SqlNonNullableCol[X]) = new SqlNamedReqExpr[X](
+  def apply [X:SqlResultType](col: SqlNonNullableCol[X]): SqlNamedExpr[X] = new SqlNamedExprImpl[X](
     name    = col.name,
-    sql     = alias+"."+col.name,
-    params  = col.params
-  )(col.paramTpe, implicitly[SqlResultType[X]])
-  def apply [X:SqlResultType](col: SqlNullableCol[X]) = new SqlNamedOptExpr[X](
-    name    = col.name,
-    sql     = alias+"."+col.name,
+    exprSql     = alias+"."+col.name,
     params  = col.params
   )(col.paramTpe, implicitly[SqlResultType[X]])
 
-  def on (pred: ast.SqlExpr[Boolean]) = Join(this.sql, pred.sql, params ++ pred.params)
+  def on (pred: ast.SqlExpr[Boolean]) = Join(selectSql, pred.sql, params ++ pred.params)
 }
 
 // TODO: is this even necessary anymore?
@@ -63,9 +60,9 @@ class SelectExprS     (s: String, params: Seq[SqlParam[_]] = Nil) extends SqlS(s
 object SelectExprS {
   implicit def fromString (s: String)           = new SelectExprS(s)
   implicit def fromFragment (s: SqlFragmentS)   = new SelectExprS(s.sql, s.params)
-  implicit def fromNamed (expr: ast.SqlNamedExpr[_]) = new SelectExprS(expr.sql, expr.params)
+  implicit def fromNamed (expr: ast.SqlNamedExpr[_]) = new SelectExprS(expr.selectSql, expr.params)
   implicit def fromExprS (expr: ExprS)          = new SelectExprS(expr.sql, expr.params)
-  implicit def fromAliased (a: AliasedSqlFragmentS) = new SelectExprS(a.sql, a.params) 
+  implicit def fromAliased (a: AliasedSqlFragmentS) = new SelectExprS(a.selectSql, a.params) 
   implicit def fromCol (a: ast.SqlCol[_])       = new SelectExprS(a.sql + " as " + a.name, a.params)
 }
 
@@ -73,8 +70,8 @@ class FromS (s: String, params: Seq[SqlParam[_]] = Seq()) extends SqlS(s, params
 object FromS {
   implicit def fromString (s: String) = new FromS(s)
   implicit def fromTable (t: ast.SqlTable[_]) = new FromS(t.sql)
-  implicit def fromAliasSqlFragmentS (s: AliasedSqlFragmentS) = new FromS(s.sql, s.params)
-  implicit def fromNamedQueryExpr (q: ast.SqlNamedQueryExpr[_]) = new FromS(q.sql, q.params)
+  implicit def fromAliasSqlFragmentS (s: AliasedSqlFragmentS) = new FromS(s.selectSql, s.params)
+  //implicit def fromNamedQueryExpr (q: ast.SqlNamedQueryExpr[_]) = new FromS(q.sql, q.params)
 }
 
 class UpdateQueryableS (s: String) extends SqlS(s)
@@ -86,6 +83,7 @@ class JoinS (s: String, params: Seq[SqlParam[_]]) extends SqlS(s, params)
 object JoinS {
   implicit def strToJoin (s: String)         = new JoinS(s, Nil)
   implicit def fromJoin (j: Join)            = new JoinS(j.sql, j.params)
+  //implicit def fromAliasSqlFragmentS (s: AliasedSqlFragmentS) = new JoinS(s.selectSql, s.params)
 }
 
 class PredicateS (s: String, params: Seq[SqlParam[_]]) extends SqlS(s, params)

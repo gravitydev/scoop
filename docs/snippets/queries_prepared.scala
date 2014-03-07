@@ -6,3 +6,4 @@ val users =
       u.created_at <= DateTime.now
     )
     .find(u.id ~ u.email)
+    .list

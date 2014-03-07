@@ -23,5 +23,6 @@ val issues: List[Issue] =
         opt(assignee.id ~ assignee.name >> User.apply) >> 
           Issue.apply
       )
+      .list
   }
 

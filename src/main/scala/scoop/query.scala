@@ -291,7 +291,7 @@ case class Query (
     x map (prefix +~ _ +~ "\n") getOrElse ("" +~ "")
 
   private def listSql (prefix: String, x: Seq[SqlS], delimiter: String = "") = 
-    ifStr(x.nonEmpty)(prefix) +~ x.reduceLeftOption(_ +~ delimiter +~ " \n" +~ _ +~ " \n").getOrElse("" +~ "") +~ " \n"
+    ifStr(x.nonEmpty)(prefix) +~ x.reduceLeftOption(_ +~ delimiter +~ " \n" +~ _ ).getOrElse("" +~ "") +~ " \n"
 
   // Monoid append would be nice
   private def ifStr (cond: Boolean)(subj: String) = (if (cond) subj else "")
@@ -304,7 +304,7 @@ case class Query (
 
   private lazy val whereSql = optSql("WHERE ", predicate)
 
-  private lazy val groupBySql = listSql("GROUP BY ", group, ",")
+  private lazy val groupBySql = listSql("GROUP BY ", group, ", ")
 
   private lazy val orderBySql = optSql("ORDER BY ", order)
 
@@ -324,23 +324,22 @@ case class Query (
     offsetSql +~
     (ifStr(forUpdateLock)("FOR UPDATE \n"))
   
-  lazy val sql = statement.sql
+  lazy val sql: String = {
+    statement.sql
+  }
 
-  lazy val params = statement.params
+  lazy val params: Seq[SqlParam[_]] = statement.params
 
-  def process [B](rowParser: ResultSet => ParseResult[B])(implicit c: Connection): Iterator[B] = executeQuery(new QueryS(sql, params))(rowParser)
+  def process [B](rowParser: ResultSet => ParseResult[B])(implicit c: Connection): QueryResult[B] = new QueryResult(executeQuery(new QueryS(sql, params))(rowParser))
 
-  def find [B](selection: Selection[B])(implicit c: Connection): QueryResult[B] = new QueryResult(select(selection.expressions:_*) process selection)
-  def findDistinct [B](selection: Selection[B])(implicit c: Connection): QueryResult[B] = new QueryResult(selectDistinct(selection.expressions:_*) process selection)
+  def find [B](selection: Selection[B])(implicit c: Connection): QueryResult[B] = select(selection.expressions:_*) process selection
+  def findDistinct [B](selection: Selection[B])(implicit c: Connection): QueryResult[B] = selectDistinct(selection.expressions:_*) process selection
 
   override def toString = {
     "Query(sql="+sql+", params=" + renderParams(params) +")"
   }
 
-  def union (q: QueryS) = (sql + "\n UNION \n" + q.sql) onParams (params ++ q.params :_*)
-  
-  // useful for subqueries
-  //def as (alias: String) = "(" +~ queryToQueryS(this) +~ ") as " +~ alias
+  def union (q: QueryS) = (sql + "\n UNION \n" + q.sql) onParams (params ++ q.params :_*)  
 }
 
 case class OrderBy (order: String, dir: String = null) {

@@ -6,8 +6,8 @@ import query.SelectExprS
 import java.sql.ResultSet
 
 object `package` {
-  private [parsers] type P[+T] = ResultSetParser[T]
-  private [parsers] type S[+T] = Selection[T]
+  private [parsers] type RP[+T] = ResultSetParser[T]
+  private [parsers] type SP[+T] = Selection[T]
  
   implicit def rightBiasParseResult [T](r: ParseResult[T]): Either.RightProjection[String,T] = r.right
 
@@ -29,16 +29,20 @@ private [scoop] class MappedSelection [T,+X] (parser: Selection[T], fn: T => X) 
   override def toString = "Selection(expressions=" + expressions + ", fn=" + util.fnToString(fn) + ")"
 }
 
-class ExprParser [+T:SqlResultType] (name: String) extends ParserBase[T] (
+class ExprParser [+T:SqlResultType] (name: String) extends Selection1[T] (
   rs => SqlResultType[T].parse(rs, name) map {Right(_)} getOrElse Left("Could not parse expression: " + name + " [" + SqlResultType[T] + "] from " + util.inspectRS(rs))
-) {
-  // TODO: i don't like this "columns" method on a parser that is just a parser
-  def columns = Nil
+)
+
+// BOILERPLATE
+abstract class SelectionX [+T] (selectors: Selection[_]*) extends SP[T] {
+  def list: List[Selection[_]] = selectors.toList
+  def expressions = list.foldLeft(List[query.SelectExprS]())((l,p) => l ++ p.expressions)
+  override def toString = list.map((x: AnyRef) => x.toString).mkString(" ~ ")
 }
 
-class OptionalExprParser [+T:SqlResultType] (name: String, sql: List[query.SqlFragmentS]) extends ParserBase[Option[T]] (
-  rs => Some(SqlResultType[T].parse(rs, name)) map {Right(_)} getOrElse Left("Could not parse expression: " + name + " [" + SqlResultType[T] + "] from " + util.inspectRS(rs))
-) {
-  def columns = sql map (x => x: query.SelectExprS)
+class Selection1 [+A] (fn: ResultSet => ParseResult[A], val expressions: List[query.SelectExprS] = Nil) extends SP[A] {
+  def >> [T](fn: A=>T) = new Selection1(apply(_) map fn, expressions)
+  def ~ [X](px: SP[X]): Selection2[A,X] = new Selection2(this, px)
+  def apply (rs: ResultSet): ParseResult[A] = fn(rs)
+  override def toString = "Selection1(fn=" + fn + ", expressions=" + expressions + ")"
 }
-

@@ -12,12 +12,31 @@ class ScoopSpec extends FlatSpec with Matchers {
  
   "Basic number operators" should "work" in {
     val num: ast.SqlExpr[Int] = 1 
-    def s (exp: SelectExprS) = exp // force conversion
 
-    s(num + 2 as "a") should matchSql("(? + ?) as a", 1, 2)
-    s(num - 2 as "a") should matchSql("(? - ?) as a", 1, 2)
-    s(num * 2 as "a") should matchSql("(? * ?) as a", 1, 2)
-    s(num / 2 as "a") should matchSql("(? / ?) as a", 1, 2)
+    (num + 2 as "x").selectSql
+
+    (num + 2 as "a") should matchSelectSql("(? + ?) as a", 1, 2)
+    (num - 2 as "a") should matchSelectSql("(? - ?) as a", 1, 2)
+    (num * 2 as "a") should matchSelectSql("(? * ?) as a", 1, 2)
+    (num / 2 as "a") should matchSelectSql("(? / ?) as a", 1, 2)
+  }
+
+  "Basic parsers" should "work" in {
+    ("SELECT ? as num1, ? as num2" %? (5,6) process (sqlInt("num1") ~ sqlInt("num2"))).head should be ((5, 6))
+
+    ("SELECT 1 as a, 2 as b, 3 as c, 4 as d, 5 as e" %? () process (
+      sqlInt("a") ~ sqlInt("b") ~ sqlInt("c") ~ sqlInt("d") ~ sqlInt("e")
+    )).head should be ((1, 2, 3, 4, 5))
+
+    using (tables.users) {u =>
+      (from(u).select(u.id, u.age) process (sqlInt(u.age.name))).head should be (30)
+    }
+  }
+
+  "Selections" should "accumulate expressions" in {
+    using (tables.users) {u =>
+      val x = (u.age >> (_.toString)) ~ (u.first_name >> (_ + "x"))
+    }
   }
   
   "Implicits" should "work" in {
@@ -32,29 +51,47 @@ class ScoopSpec extends FlatSpec with Matchers {
         .where(u.email.isNotNull)
         .find(u.email)
         .list
-    }
+    } should be (List("simplepic@gmail.com"))
   }
 
   "Parsers" should "work with aliased expressions" in {
     using (tables.users) {u =>
-      from(u).find(Parsers.total( functions.count(u.id) as "test" )).list
+      val q = from(u)
+        .select( functions.count( u.id ) as "x" )
+
+      from(u)
+        .find( Parsers.total( functions.count(u.id) ) as "x" )
+        .list
     }
   }
   
   "Functions" should "output correct sql" in {
     import functions._
-    coalesce(1, 0).as("total") should matchSql("COALESCE(?, ?) as total", 1, 0)
+
+    coalesce(1, 0).as("total") should matchSelectSql("COALESCE(?, ?) as total", 1, 0)
     select(count(1).as("total"), 4 as "num") should matchSql("SELECT COUNT(?) as total, ? as num", 1, 4)
     select(coalesce(countDistinct(1), 0L) as "total", 4 as "num") should matchSql("SELECT COALESCE(COUNT(DISTINCT ?), ?) as total, ? as num", 1, 0, 4)
 
     using (tables.users as "u") {u =>
-      (coalesce(u.id, 0L) as "v") should matchSql("COALESCE(u.id, ?) as v", 0L)
+      (coalesce(u.id, 0L) as "v") should matchSelectSql("COALESCE(u.id, ?) as v", 0L)
 
       from(u).find(coalesce(countDistinct(u.id), 0L).as("total")).head should be (1)
     }
   }
 
-  "Subquery expression" should "work" in {
+  "Subquery" should "work in the SELECT clause" in {
+    using (tables.users) {u =>
+      from(u)
+        .find(
+          from(u)
+            .limit(1)
+            .select(u.id) as "a"
+        )
+        .list should be (List(1))
+    }
+  }
+
+  "Subquery expression" should "work with EXISTS" in {
     using (tables.users) {u => 
       val q = from(u)
         .where(
@@ -62,8 +99,6 @@ class ScoopSpec extends FlatSpec with Matchers {
           u.id === from(u).limit(1).select(u.id)
         )
         .select(u.id)
-
-      from(u).find(from(u).limit(1).select(u.id) as "a").list should be (List(1))
 
       /*
        * INSERT INTO cars (make, model)
@@ -92,9 +127,21 @@ class ScoopSpec extends FlatSpec with Matchers {
 
   "Upserts" should "work" in {
     using (tables.users) {u =>
-      insertInto(u)
-        .set(u.id := 1, u.first_name := "Alvaro", u.last_name := "Carrasco", u.email := "simplepic@gmail.com")
+      val x = insertInto(u)
+        .set(
+          u.id := 1, 
+          u.first_name := "Alvaro", 
+          u.last_name := "Carrasco", 
+          u.email := "simplepic@gmail.com",
+          u.age := 31
+        )
         .onDuplicateKeyUpdate(u.age := u.age + 2)()
+
+      from(u).where(u.id === 1).find(u.age).head should be (32)
+
+      update(u)
+        .set(u.age := 30) 
+        .where(u.id === 1)()
     }
   }
 
@@ -135,19 +182,24 @@ class ScoopSpec extends FlatSpec with Matchers {
 
       // aliases from subquery
       sub[Long]("id") should matchSql("sub.id")
-      sub(u.id) should matchSql("sub.users_id")
+
+      sub(u.id) should matchSelectSql("sub.users_id as users_id")
     }
   }
 
   "A subquery" should "work on the JOIN clause" in {
-    using (tables.users) {u =>
+    using (tables.users, tables.users) {(u,u2) =>
       // must define subquery first to obtain an alias
       val sub = from(u).where(u.id === 1).select(u.id) as "p"
 
-      from(u)
-        .innerJoin(sub on u.id === sub(u.id))
-        .find(u.id ~ sub(u.id))
+      from(u2)
+        .innerJoin(sub on u2.id === sub(u.id))
+        .find(u2.id ~ sub(u.id))
         .list
+
+      val q = from(u2)
+        .innerJoin(sub on u2.id === sub(u.id))
+        .select(u2.id, sub(u.id))
     }
   }
 
@@ -280,7 +332,6 @@ class ScoopSpec extends FlatSpec with Matchers {
     val testParser = i.id ~ xparser
     val qq = from(i) select(testParser.expressions:_*) 
     val qx = from(i).where(i.id |=| subquery[Long](qq))
-    //println(qx)
 
     val num = "SELECT 1 as num FROM users WHERE 1 = ?" %? 1 process sqlInt("num") head;
 
