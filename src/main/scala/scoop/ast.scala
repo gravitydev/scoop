@@ -270,7 +270,7 @@ class SqlNonNullableCol[T:SqlMappedType](val columnName: String, cast: Option[St
   val resultTpe = SqlResultType[T]
   override def toString = "Col(" + columnName + " as " + name + ")"
 
-  def apply (rs: ResultSet) = resultTpe.parseOr(rs, name, s"Column [${name}] not found in ResultSet: ${util.inspectRS(rs)}")
+  def apply (rs: ResultSet) = resultTpe.parseOr(rs, name, "Column ["+name+"] not found in ResultSet: "+util.inspectRS(rs))
 
   def nullable = new SqlNullableCol[T](columnName, cast, table, explicitAlias)
   def := (x: SqlExpr[T]) = new SqlAssignment(this, x)

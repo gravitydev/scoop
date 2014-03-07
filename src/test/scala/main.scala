@@ -21,6 +21,15 @@ class ScoopSpec extends FlatSpec with Matchers {
     (num / 2 as "a") should matchSelectSql("(? / ?) as a", 1, 2)
   }
 
+  "Literal expressions" should "work" in {
+    ("SELECT 1" %? () process literal(24L)).head should be (24L)
+
+    using (tables.users) {u =>
+      from(u)
+        .find(u.id ~ literal("test")).head should be ((1L, "test"))
+    }
+  }
+
   "Basic parsers" should "work" in {
     ("SELECT ? as num1, ? as num2" %? (5,6) process (sqlInt("num1") ~ sqlInt("num2"))).head should be ((5, 6))
 

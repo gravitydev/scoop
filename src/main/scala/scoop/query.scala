@@ -55,7 +55,7 @@ object `package` {
   def sql [T:SqlParamType:SqlResultType] (sql: SqlS): SqlExpr[T] = new SqlRawExpr[T](sql.sql, sql.params)
   
   // necessary anymore?
-  def subquery [T:SqlParamType] (q: QueryS): SqlExpr[T] = new SqlRawParamExpr(s"(${q.sql})", q.params)
+  def subquery [T:SqlParamType] (q: QueryS): SqlExpr[T] = new SqlRawParamExpr("("+q.sql+")", q.params)
 
   // safe aliasing
   private class Aliaser {

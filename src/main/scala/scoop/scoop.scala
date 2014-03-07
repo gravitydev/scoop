@@ -106,7 +106,8 @@ case class SqlSetParam [T](v: Set[T])(implicit tp: ast.SqlParamType[T]) extends 
   def apply (stmt: PreparedStatement, idx: Int) = sys.error("WTF!")
 }
 
-case class literal [T] (value: T) extends ResultSetParser [T] {
+case class literal [T] (value: T) extends Selection [T] {
+  val expressions = Nil
   def apply (rs: ResultSet) = Right(value)
 }
 
