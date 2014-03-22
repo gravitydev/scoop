@@ -1,7 +1,7 @@
 package com.gravitydev.scoop
 package parsers
 
-import ast.SqlResultType
+import ast.SqlType
 import query.SelectExprS
 import java.sql.ResultSet
 
@@ -29,8 +29,8 @@ private [scoop] class MappedSelection [T,+X] (parser: Selection[T], fn: T => X) 
   override def toString = "Selection(expressions=" + expressions + ", fn=" + util.fnToString(fn) + ")"
 }
 
-class ExprParser [+T:SqlResultType] (name: String) extends Selection1[T] (
-  rs => SqlResultType[T].parse(rs, name) map {Right(_)} getOrElse Left("Could not parse expression: " + name + " [" + SqlResultType[T] + "] from " + util.inspectRS(rs))
+class ExprParser [+T:SqlType] (name: String) extends Selection1[T] (
+  rs => SqlType[T].parse(rs, name) map {Right(_)} getOrElse Left("Could not parse expression: " + name + " [" + SqlType[T] + "] from " + util.inspectRS(rs))
 )
 
 // BOILERPLATE

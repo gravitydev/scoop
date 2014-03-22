@@ -5,7 +5,7 @@ import java.sql.{Connection, Date, Timestamp, ResultSet}
 import scala.collection.mutable.ListBuffer
 import util.{ResultSetIterator, QueryResult}
 import scala.collection._, 
-  ast.{SqlAssignment, SqlParamType, SqlResultType, SqlLiteralExpr, SqlCol, SqlRawExpr, SqlWrappedExpr, SqlNamedExpr, SqlRawParamExpr}
+  ast.{SqlAssignment, SqlType, SqlParseExpr, SqlLiteralExpr, SqlCol, SqlRawExpr, SqlNamedExpr, SqlRawParamExpr, SqlWrappedExpr}
 
 class ColumnParser (name: String)
 
@@ -13,23 +13,21 @@ object `package` {
   @deprecated("Use SqlExpr[Boolean]", "0.1.23-SNAPSHOT")
   type Predicate = ast.SqlExpr[Boolean]
 
-  //def col [T] (name: String) = new ColumnParser
-
   // only here for backwards compat
   @deprecated("Use .find(...).list to explicitly convert QueryResult[T] to List[T]", "0.3.0-SNAPSHOT")
   implicit def queryResultToList [T](rs: util.QueryResult[T]) = rs.list
   
-  implicit def stringToFragment (s: String) = new SqlFragmentS(s, Seq())
+  implicit def stringToFragment (s: String) = new SqlFragmentS(s, Nil)
  
   // kind of hacky 
   implicit def intToLongExpr (a: SqlExpr[Int]): SqlExpr[Long] = new SqlWrappedExpr[Int,Long](a)(sqlLong)
 
   implicit def fragmentToQueryS (s: SqlFragmentS) = new QueryS(s.sql, s.params)
 
-  implicit def baseToSqlLit [T](base: T)(implicit sqlType: SqlParamType[T]): SqlExpr[T] = SqlLiteralExpr(base)
+  implicit def baseToSqlLit [T](base: T)(implicit sqlType: SqlType[T]): SqlParseExpr[T] = SqlLiteralExpr(base)
   implicit def tableToWrapped [T <: Table[_]] (t: T) = new TableOps(t)
-  implicit def optToSqlLit [T](base: Option[T])(implicit sqlType: SqlParamType[T]) = base map {x => SqlLiteralExpr(x)}
-  implicit def baseToParam [T](base: T)(implicit sqlType: SqlParamType[T]) = SqlSingleParam(base)
+  implicit def optToSqlLit [T](base: Option[T])(implicit sqlType: SqlType[T]) = base map {x => SqlLiteralExpr(x)}
+  implicit def baseToParam [T](base: T)(implicit sqlType: SqlType[T]) = SqlSingleParam(base)
 
   implicit def assignmentToAssignmentS (a: SqlAssignment[_]) = new AssignmentS(a.sql, a.params)
   implicit def optionalAssignmentToAssignmentS (a: Option[SqlAssignment[_]]) = a map assignmentToAssignmentS getOrElse new AssignmentS("",Nil)
@@ -40,8 +38,8 @@ object `package` {
   implicit def sqlToFragment (s: SqlS) = new SqlFragmentS(s.sql, s.params)
 
   // should these be in the functions package?
-  def exists [T:SqlParamType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "EXISTS", postfix=false)
-  def notExists [T:SqlParamType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "NOT EXISTS", postfix=false) 
+  def exists [T:SqlType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "EXISTS", postfix=false)
+  def notExists [T:SqlType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "NOT EXISTS", postfix=false) 
 
   // starting point
   def from (table: FromS) = Query(Some(table))
@@ -51,11 +49,11 @@ object `package` {
   def update (table: UpdateQueryableS) = new UpdateBuilder(table)
   def deleteFrom (table: UpdateQueryableS) = new DeleteBuilder(table)
 
-  def sql [T:SqlParamType:SqlResultType] (sql: String): SqlExpr[T] = new SqlRawExpr[T](sql, Nil)
-  def sql [T:SqlParamType:SqlResultType] (sql: SqlS): SqlExpr[T] = new SqlRawExpr[T](sql.sql, sql.params)
+  def sql [T:SqlType] (sql: String): SqlParseExpr[T] = new SqlRawExpr[T](sql, Nil)
+  def sql [T:SqlType] (sql: SqlS): SqlParseExpr[T] = new SqlRawExpr[T](sql.sql, sql.params)
   
   // necessary anymore?
-  def subquery [T:SqlParamType] (q: QueryS): SqlExpr[T] = new SqlRawParamExpr("("+q.sql+")", q.params)
+  def subquery [T:SqlType] (q: QueryS): SqlExpr[T] = new SqlRawParamExpr("("+q.sql+")", q.params)
 
   // safe aliasing
   private class Aliaser {
@@ -116,21 +114,21 @@ class TableOps [T <: Table[_]](t: T) {
   def on (pred: SqlExpr[Boolean]) = Join(t.sql, pred.sql, pred.params)
 }
 
-case class Join (table: String, predicate: String, params: Seq[SqlParam[_]]) {
+case class Join (table: String, predicate: String, params: List[SqlParam[_]]) {
   def sql: String = table + " ON " + predicate
 }
 
 class InsertBuilder (into: String) {
-  def set (assignments: AssignmentS*) = Insert (into, assignments.map(_.sql).filter(_.nonEmpty).toList, assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params})
+  def set (assignments: AssignmentS*) = Insert (into, assignments.map(_.sql).filter(_.nonEmpty).toList, assignments.foldLeft(List[SqlParam[_]]()){(a,b) => a ++ b.params})
   def values (assignments: SqlAssignment[_]*) = Insert2(into, assignments.filter(_.sql.nonEmpty).toList)
-  def apply (columns: SqlCol[_]*) = new InsertBuilder2(into, columns)
+  def apply (columns: SqlCol[_]*) = new InsertBuilder2(into, columns.toList)
 }
-class InsertBuilder2 (into: String, columns: Seq[SqlCol[_]]) {
+class InsertBuilder2 (into: String, columns: List[SqlCol[_]]) {
   def values (sql: SqlS) = Insert3(into, columns, sql)
 }
 
 class UpdateBuilder (tb: UpdateQueryableS) {
-  def set (assignments: AssignmentS*) = Update (tb.sql, assignments.map(_.sql).filter(_.nonEmpty).toList, None, assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params})
+  def set (assignments: AssignmentS*) = Update (tb.sql, assignments.map(_.sql).filter(_.nonEmpty).toList, None, assignments.foldLeft(List[SqlParam[_]]()){(a,b) => a ++ b.params})
 }
 
 class DeleteBuilder (tb: UpdateQueryableS) {
@@ -138,7 +136,7 @@ class DeleteBuilder (tb: UpdateQueryableS) {
 }
 
 sealed trait InsertBase {
-  def params: Seq[SqlParam[_]]
+  def params: List[SqlParam[_]]
   def sql: String
   def apply ()(implicit c: Connection) = try {
     import java.sql.Statement
@@ -159,13 +157,13 @@ sealed trait InsertBase {
   }
 
   // upsert
-  def onDuplicateKeyUpdate (assignments: AssignmentS*) = Upsert(this, assignments.map(_.sql).filter(_.nonEmpty).toList, assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params})
+  def onDuplicateKeyUpdate (assignments: AssignmentS*) = Upsert(this, assignments.map(_.sql).filter(_.nonEmpty).toList, assignments.foldLeft(List[SqlParam[_]]()){(a,b) => a ++ b.params})
 }
 
 case class Insert (
   into: String,
   assignments: List[String] = Nil,
-  params: Seq[SqlParam[_]] = Nil,
+  params: List[SqlParam[_]] = Nil,
   comment: Option[String] = None
 ) extends InsertBase {
   def comment (c: String): Insert = copy(comment = Some(c))
@@ -179,7 +177,7 @@ case class Insert2 (
   comment: Option[String] = None
 ) extends InsertBase {
   def comment (c: String): Insert2 = copy(comment = Some(c))
-  def params: Seq[SqlParam[_]] = assignments.foldLeft(Seq[SqlParam[_]]()){(a,b) => a ++ b.params}
+  def params: List[SqlParam[_]] = assignments.foldLeft(List[SqlParam[_]]()){(a,b) => a ++ b.params}
   def sql: String = "INSERT INTO " + into + " (" + assignments.map(_.col.columnName).mkString(", ") + ") VALUES (" + assignments.map(_.valueSql).mkString(", ") + ")"
 }
 
@@ -192,7 +190,7 @@ case class InsertBatch (
 case class Upsert (
   insert: InsertBase,
   assignments: List[String] = Nil,
-  updateParams: Seq[SqlParam[_]]  = Nil
+  updateParams: List[SqlParam[_]]  = Nil
 ) extends InsertBase {
   def sql = insert.sql + " ON DUPLICATE KEY UPDATE " + assignments.mkString(", ")
   def params = insert.params ++ updateParams
@@ -201,12 +199,12 @@ case class Upsert (
 // using a subselect
 case class Insert3 (
   into: String,
-  columns: Seq[SqlCol[_]],
+  columns: List[SqlCol[_]],
   query: SqlS,
   comment: Option[String] = None
 ) extends InsertBase {
   def comment (c: String): Insert3 = copy(comment = Some(c))
-  def params: Seq[SqlParam[_]] = query.params 
+  def params: List[SqlParam[_]] = query.params 
   def sql: String = "INSERT INTO " + into + " (" + columns.map(_.columnName).mkString(", ") + ")\n" + query.sql
 }
 
@@ -214,7 +212,7 @@ case class Update (
   table: String,
   assignments: List[String] = Nil,
   predicate: Option[String] = None,
-  params: Seq[SqlParam[_]]  = Nil,
+  params: List[SqlParam[_]]  = Nil,
   comment: Option[String] = None
 ) {
   def where (pred: PredicateS) = copy(predicate = predicate.map(_ + " AND " + pred.sql).orElse(Some(pred.sql)), params = this.params ++ pred.params)
@@ -233,7 +231,7 @@ case class Update (
 case class Delete (
   table: String,
   predicate: String,
-  params: Seq[SqlParam[_]] = Nil,
+  params: List[SqlParam[_]] = Nil,
   comment: Option[String] = None
 ) {
   def where (pred: PredicateS) = copy(predicate = predicate + " AND " + pred.sql, params = this.params ++ pred.params)
@@ -261,7 +259,7 @@ case class Query (
 ) {
 
   // single expr, useful to have it typed for subqueries
-  def select [T:SqlParamType](expr: SqlNamedExpr[T]): ast.SqlQueryExpr[T] = ast.SqlQueryExpr[T](select(expr: SelectExprS))
+  def select [I](expr: SqlNamedExpr[I,I]): ast.SqlQueryExpr[I] = ast.SqlQueryExpr[I](select(expr: SelectExprS), expr)(expr.sqlTpe)
 
   def select (cols: SelectExprS*): Query = copy(sel = cols.toList)
   def forUpdate ()            = copy(forUpdateLock = true)
@@ -275,7 +273,7 @@ case class Query (
 
   def orderBy (order: OrderByS*) = copy(
     order = Some( 
-      order.toList.map(_.sql).mkString(", ") %? (order.foldLeft(Seq[SqlParam[_]]())((a,b) => a ++ b.params):_*)
+      order.toList.map(_.sql).mkString(", ") %? (order.foldLeft(List[SqlParam[_]]())((a,b) => a ++ b.params):_*)
     )
   )
   def groupBy (cols: ExprS*) = copy(
@@ -285,12 +283,12 @@ case class Query (
   def offset (o: Int): Query = copy(offset = Some(o))
   def comment (c: String): Query = copy(comment = Some(c))
   
-  def as (alias: String) = new AliasedSqlFragmentS(sql, alias, params)
+  def as (alias: String) = new ast.SqlNamedQuery(this, alias) 
 
   private def optSql(prefix: String, x: Option[SqlS]) = 
     x map (prefix +~ _ +~ "\n") getOrElse ("" +~ "")
 
-  private def listSql (prefix: String, x: Seq[SqlS], delimiter: String = "") = 
+  private def listSql (prefix: String, x: List[SqlS], delimiter: String = "") = 
     ifStr(x.nonEmpty)(prefix) +~ x.reduceLeftOption(_ +~ delimiter +~ " \n" +~ _ ).getOrElse("" +~ "") +~ " \n"
 
   // Monoid append would be nice
@@ -328,7 +326,7 @@ case class Query (
     statement.sql
   }
 
-  lazy val params: Seq[SqlParam[_]] = statement.params
+  lazy val params: List[SqlParam[_]] = statement.params
 
   def process [B](rowParser: ResultSet => ParseResult[B])(implicit c: Connection): QueryResult[B] = new QueryResult(executeQuery(new QueryS(sql, params))(rowParser))
 

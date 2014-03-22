@@ -1,7 +1,7 @@
 package com.gravitydev.scoop
 
 import java.sql.{ResultSet, PreparedStatement, Types, Timestamp, Date}
-import ast.{SqlParamType, SqlResultType, SqlNamedExpr, SqlNonNullableCol, SqlNullableCol}
+import ast.{SqlNamedExpr, SqlParseExpr, SqlWrappedExpr, SqlNonNullableCol, SqlNullableCol}
 import parsers.Selection1
 
 object `package` {
@@ -9,6 +9,7 @@ object `package` {
   type Table[T <: ast.SqlTable[T]] = ast.SqlTable[T]
   type TableCompanion[T <: Table[T]] = {def apply() : T}
 
+  type SqlType[T]         = ast.SqlType[T]
   type SqlExpr[T]         = ast.SqlExpr[T]
   type SqlNativeType[T]   = ast.SqlNativeType[T]
   type SqlCustomType[I,O] = ast.SqlCustomType[I,O]
@@ -17,9 +18,6 @@ object `package` {
   type ResultSetParser[T] = parsers.ResultSetParser[T]
 
   type ParseResult[+T] = Either[String,T]
-
-  @deprecated("Use ast.SqlMappedType if you need to (you shouldn't)", "0.1.23-SNAPSHOT")
-  type SqlType[T] = ast.SqlMappedType[T]
 
   // native types
   implicit val sqlInt        = new SqlNativeType [Int]          (Types.INTEGER,   _ getInt _,       _ getInt _,        _ setInt (_,_))  
@@ -59,27 +57,27 @@ object `package` {
     )
   }
 
-  // TODO: figure out how to not need this
-  //implicit def wrapParser [T](parser: parsers.ResultSetParser[T]) = new parsers.ParserWrapper(parser)
-  //implicit def wrapSelection[T](selection: Selection[T]) = new parsers.Selection1(selection)
-
-  //implicit def selectionFromParser [T](parser: ResultSetParser[T]): Selection1[T] = new Selection1 [T] (parser)
-  
   // TODO: clean up these hacks
-  implicit def setT[X:ast.SqlParamType] = new SqlNativeType [Set[X]] (
+  implicit def setT[X:SqlType] = new SqlNativeType [Set[X]] (
     -1, 
     (_,_) => sys.error("internal"), 
     (_,_) => sys.error("internal"), 
     (_,_,_) => sys.error("internal")
   )
 
-  implicit def namedExprToSelection [X:SqlResultType] (expr: SqlNamedExpr[X]): Selection1[X] = new Selection1[X] (
-    rs => SqlResultType[X].parseOr(rs, expr.name, "Could not parse expression: " + expr.name + " [" + SqlResultType[X] + "] from " + util.inspectRS(rs)), 
+  implicit def namedExprToSelection [I:SqlType, O] (expr: SqlNamedExpr[I,O]): Selection1[O] = new Selection1[O] (
+    rs => expr(rs), 
     List( new query.SelectExprS(expr.selectSql, expr.params) )
   ) 
 
-  implicit def nonNullableColToSelection [X:SqlResultType] (col: SqlNonNullableCol[X]): Selection1[X] = new Selection1 (col, col.expressions)
-  implicit def nullableColToSelection [X:SqlResultType] (col: SqlNullableCol[X]): Selection1[Option[X]] = new Selection1 (col, col.expressions)
+  implicit def nonNullableColToSelection [X:SqlType] (col: SqlNonNullableCol[X]): Selection1[X] = new Selection1 (col, col.expressions)
+  implicit def nullableColToSelection [X:SqlType] (col: SqlNullableCol[X]): Selection1[Option[X]] = new Selection1 (col, col.expressions)
+
+  implicit def exprToParseExpr [T](expr: SqlExpr[T]): SqlParseExpr[T] = new SqlParseExpr [T] {
+    val sqlTpe = expr.sqlTpe
+    val sql = expr.sql
+    val params = expr.params
+  }
   
   private[scoop] def renderParams (params: Seq[SqlParam[_]]) = params.map(x => x.v + ":"+x.v.asInstanceOf[AnyRef].getClass.getName.stripPrefix("java.lang."))
 }
@@ -97,11 +95,11 @@ sealed trait SqlParam [T] {
   def apply (stmt: PreparedStatement, idx: Int): Unit
 }
 
-case class SqlSingleParam [T,S] (v: T)(implicit val tp: ast.SqlParamType[T]) extends SqlParam[T] {
+case class SqlSingleParam [T,S] (v: T)(implicit val tp: ast.SqlType[T]) extends SqlParam[T] {
   override def toString = v.toString + ":" + v.getClass
   def apply (stmt: PreparedStatement, idx: Int) = tp.set(stmt, idx, v)
 }
-case class SqlSetParam [T](v: Set[T])(implicit tp: ast.SqlParamType[T]) extends SqlParam[Set[T]] {
+case class SqlSetParam [T](v: Set[T])(implicit tp: ast.SqlType[T]) extends SqlParam[Set[T]] {
   def toList = v.toList.map(x => SqlSingleParam(x))
   def apply (stmt: PreparedStatement, idx: Int) = sys.error("WTF!")
 }
