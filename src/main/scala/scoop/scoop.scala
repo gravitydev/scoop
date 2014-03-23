@@ -65,13 +65,15 @@ object `package` {
     (_,_,_) => sys.error("internal")
   )
 
-  implicit def namedExprToSelection [I:SqlType, O] (expr: SqlNamedExpr[I,O]): Selection1[O] = new Selection1[O] (
+  /*
+  implicit def namedExprToSelection [I, O] (expr: SqlNamedExpr[_,O]): Selection1[O] = new Selection1[O] (
     rs => expr(rs), 
     List( new query.SelectExprS(expr.selectSql, expr.params) )
   ) 
+  */
 
-  implicit def nonNullableColToSelection [X:SqlType] (col: SqlNonNullableCol[X]): Selection1[X] = new Selection1 (col, col.expressions)
-  implicit def nullableColToSelection [X:SqlType] (col: SqlNullableCol[X]): Selection1[Option[X]] = new Selection1 (col, col.expressions)
+  implicit def nonNullableColToSelection [X] (col: SqlNonNullableCol[X]): Selection1[X] = new Selection1 (col, col.expressions)
+  implicit def nullableColToSelection [X] (col: SqlNullableCol[X]): Selection1[Option[X]] = new Selection1 (col, col.expressions)
 
   implicit def exprToParseExpr [T](expr: SqlExpr[T]): SqlParseExpr[T] = new SqlParseExpr [T] {
     val sqlTpe = expr.sqlTpe

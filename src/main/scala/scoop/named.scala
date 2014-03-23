@@ -15,7 +15,7 @@ trait SqlNamed {
 }
 
 /** Typed parseable sql expression */
-trait SqlNamedExpr [I,O] extends SqlExpr[I] with SqlNamed {self =>
+trait SqlNamedExpr [I,+O] extends SqlExpr[I] with SqlNamed with parsers.ExprSelection [O] {self =>
   def parse (rs: ResultSet): Option[O]
 
   def apply (rs: ResultSet): ParseResult[O] = parse(rs).toRight("Column ["+name+"] not found in ResultSet: "+util.inspectRS(rs))
@@ -30,11 +30,15 @@ trait SqlNamedExpr [I,O] extends SqlExpr[I] with SqlNamed {self =>
 
   // this should only be applicable to sub-queries
   def apply [X:SqlType](column: String) = new SqlRawExpr[X](name+"."+column)
-  def apply [X:SqlType](col: ast.SqlNamedExpr[X,X]) = new ast.SqlRawExpr[X](name+"."+col.name).as(col.name)
+  def apply [X](col: ast.SqlNamedOptExpr[X]): ast.SqlNamedOptExpr[X] = new ast.SqlRawOptExpr[X](name+"."+col.name)(col.sqlTpe).as(col.name)
+  def apply [X](col: ast.SqlNamedStrictExpr[X]): ast.SqlNamedStrictExpr[X] = new ast.SqlRawExpr[X](name+"."+col.name)(col.sqlTpe).as(col.name)
 }
 
+trait SqlNamedStrictExpr [T] extends SqlNamedExpr[T,T]
+trait SqlNamedOptExpr [T] extends SqlNamedExpr[T,Option[T]] 
+
 private [scoop] class SqlNamedExprImpl [T:SqlType] (val name: String, exprSql: String, val params: List[SqlParam[_]]) 
-    extends SqlExpr[T] with SqlNamedExpr[T,T] with Selection[T] {self =>
+    extends SqlExpr[T] with SqlNamedStrictExpr[T] with Selection[T] {self =>
   val sqlTpe = SqlType[T]
 
   def sql = exprSql
@@ -45,7 +49,7 @@ private [scoop] class SqlNamedExprImpl [T:SqlType] (val name: String, exprSql: S
 }
 
 private [scoop] class SqlOptNamedExprImpl[T:SqlType] (val name: String, exprSql: String, val params: List[SqlParam[_]])
-    extends SqlExpr[T] with SqlNamedExpr[T,Option[T]] with Selection[Option[T]] {self =>
+    extends SqlExpr[T] with SqlNamedOptExpr[T] with Selection[Option[T]] {self =>
 
   val sqlTpe = SqlType[T]
 
@@ -76,7 +80,8 @@ private [scoop] class SqlNamedQuery (val query: Query, val name: String) extends
 
   // generate a column alias
   def apply [X:SqlType](column: String) = new SqlRawExpr[X](name+"."+column)
-  def apply [X:SqlType](col: ast.SqlNamedExpr[X,X]) = new ast.SqlRawExpr[X](name+"."+col.name).as(col.name)
+  def apply [X](col: ast.SqlNamedOptExpr[X]): ast.SqlNamedOptExpr[X] = new ast.SqlRawOptExpr[X](name+"."+col.name)(col.sqlTpe).as(col.name)
+  def apply [X](col: ast.SqlNamedStrictExpr[X]): ast.SqlNamedStrictExpr[X] = new ast.SqlRawExpr[X](name+"."+col.name)(col.sqlTpe).as(col.name)
 
 }
 

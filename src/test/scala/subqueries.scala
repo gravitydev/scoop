@@ -9,7 +9,7 @@ class SubqueriesSpec extends FlatSpec with Matchers {
 
   Class forName "com.mysql.jdbc.Driver"
   implicit lazy val con = java.sql.DriverManager.getConnection("jdbc:mysql://localhost/scoop_test", "root", "")
- 
+
   "Subquery" should "work in the SELECT clause" in {
     using (tables.users) {u =>
       val sub = from(u).select(u.age as "age")
@@ -94,7 +94,7 @@ class SubqueriesSpec extends FlatSpec with Matchers {
 
       from(u2)
         .innerJoin(sub on u2.id === sub(u.id))
-        .find(u2.id ~ sub(u.id))
+        .find(u2.id ~ sub(u.id: ast.SqlNamedStrictExpr[Long]))
         .list
 
       val q = from(u2)
@@ -117,14 +117,22 @@ class SubqueriesSpec extends FlatSpec with Matchers {
     }
   }
 
+
   "Subquery on the from clause" should "work" in {
     using (tables.users) {u =>
       // must alias
-      val subq = from(u).select(u.id, u.first_name) as "u"
+      val subq = from(u).select(u.id, u.age, u.nickname) as "u"
+      
+      val parser1 = u.age ~ subq(u.age)
 
-      from( subq )
-        .find( subq(u.id) )
+      val parser2 = subq(u.id) ~ subq(u.nickname) 
+
+      val res = from( subq )
+        .find( subq(u.id) ~ subq(u.nickname) ~ subq(u.age))
         .list
+        .head
+
+      res should be ((1, None, 30))
     }
   }  
 

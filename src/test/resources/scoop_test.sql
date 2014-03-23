@@ -54,6 +54,7 @@ CREATE TABLE `users` (
   `last_name` varchar(255) NOT NULL,
   `email` varchar(255) NOT NULL,
   `age` int(11) NOT NULL,
+  `nickname` varchar(100) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -64,7 +65,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES (1,'Alvaro','Carrasco','simplepic@gmail.com',30);
+INSERT INTO `users` VALUES (1,'Alvaro','Carrasco','simplepic@gmail.com',30, null);
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

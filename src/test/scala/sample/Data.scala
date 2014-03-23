@@ -30,6 +30,7 @@ object Data {
       def last_name   = col[String]       ('last_name)
       def email       = col[String]       ('email)
       def age         = col[Int]          ('age)
+      def nickname    = col[String]       ('nickname) nullable
     }
   }
   
