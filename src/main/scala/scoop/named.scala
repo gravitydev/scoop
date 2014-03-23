@@ -1,7 +1,7 @@
 package com.gravitydev.scoop
 package ast
 
-import query.Query
+import query.{Query, Join}
 import java.sql.ResultSet
 
 /** 
@@ -83,5 +83,6 @@ private [scoop] class SqlNamedQuery (val query: Query, val name: String) extends
   def apply [X](col: ast.SqlNamedOptExpr[X]): ast.SqlNamedOptExpr[X] = new ast.SqlRawOptExpr[X](name+"."+col.name)(col.sqlTpe).as(col.name)
   def apply [X](col: ast.SqlNamedStrictExpr[X]): ast.SqlNamedStrictExpr[X] = new ast.SqlRawExpr[X](name+"."+col.name)(col.sqlTpe).as(col.name)
 
+  def on (pred: SqlExpr[Boolean]) = Join(sql, pred.sql, params ++ pred.params)
 }
 

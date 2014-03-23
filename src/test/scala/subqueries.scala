@@ -137,5 +137,16 @@ class SubqueriesSpec extends FlatSpec with ShouldMatchers {
     }
   }  
 
+  "A join" should "work with a subquery" in {
+    using (tables.issues, tables.users) {(i,u) =>
+      val subq = from(u).select(u.id, u.age) as "x"
+
+      from(i)
+        .innerJoin(subq on i.assigned_to === subq(u.id))
+        .find(i.id)
+        .list
+    }
+  }
+
 }
 
