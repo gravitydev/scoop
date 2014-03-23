@@ -1,7 +1,8 @@
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.FlatSpec
+import org.scalatest.matchers.ShouldMatchers
 import com.gravitydev.scoop._, query._
 
-class ScoopSpec extends FlatSpec with Matchers {
+class ScoopSpec extends FlatSpec with ShouldMatchers {
   import sample.Data._
   import sample.Models._
   import sample.Parsers
