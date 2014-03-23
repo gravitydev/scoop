@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/gravitydev/scoop.svg?branch=rs-iterator2)](https://travis-ci.org/gravitydev/scoop)
+
 Scoop
 =====
 
