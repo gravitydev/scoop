@@ -1,0 +1,7 @@
+language: scala
+scala:
+   - 2.9.3
+   - 2.10.3
+before_script:
+  - mysql -e 'create database scoop_test;'
+  - mysql -u root scoop_test < src/test/resources/scoop_test.sql
