@@ -18,13 +18,11 @@ object ScoopBuild extends Build {
     testOptions in Test += Tests.Argument("-oF")
   )
 
-  /*
   lazy val plugin = Project(id = "scoop-sbt-plugin", base = file("sbt-plugin")).settings(
     sbtPlugin := true,
     libraryDependencies := Seq(
       "mysql" % "mysql-connector-java" % "5.1.18" % "compile"
     )	  
   )
-  */
 }
 
