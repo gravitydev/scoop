@@ -15,7 +15,15 @@ object ScoopBuild extends Build {
       "mysql"         % "mysql-connector-java"  % "5.1.18"  % "test"
     ),
     scalacOptions ++= Seq("-deprecation","-unchecked"/*,"-XX:-OmitStackTraceInFastThrow"*/),
-    testOptions in Test += Tests.Argument("-oF")
+    testOptions in Test += Tests.Argument("-oF"),
+    sourceGenerators in Compile += {
+      scoopGenerateTask.task
+    },
+    scoopJdbcUrl := "jdbcurlstuff",
+    scoopGenerateTask := {
+      println(scoopJdbcUrl.value)
+      Seq[java.io.File]()
+    }
   )
 
   lazy val plugin = Project(id = "scoop-sbt-plugin", base = file("sbt-plugin")).settings(
@@ -24,5 +32,12 @@ object ScoopBuild extends Build {
       "mysql" % "mysql-connector-java" % "5.1.18" % "compile"
     )	  
   )
+
+  val scoopJdbcUrl = settingKey[String]("The JDBC URL for the database to inspect.")
+  val scoopJdbcUsername = settingKey[String]("The JDBC username for the the database to inspect.")
+  val scoopJdbcPassword = settingKey[String]("The JDBC password for the database to inspect.")
+
+  val scoopGenerateTask = taskKey[Seq[java.io.File]]("Generate the Scoop metadata for the configured database.")
+
 }
 
