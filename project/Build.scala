@@ -8,6 +8,7 @@ object ScoopBuild extends Build {
     organization  := "com.gravitydev",
     name          := "scoop",
     version       := "1.0.0-alpha9",
+    scalaVersion  := "2.11.0",
     crossScalaVersions := Seq("2.11.0", "2.10.4"),
     publishTo := Some(gravityRepo),
     libraryDependencies ++= Seq(
