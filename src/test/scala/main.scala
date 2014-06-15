@@ -109,7 +109,7 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
     }
   }
 
-  "Ordering on expressions" should "work" in {
+  "Ordering" should "work with expressions" in {
     using(tables.users) {u =>
       from(u)
         .where(u.id === 24L)
@@ -118,6 +118,17 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
         .list
     }
   }
+
+  /*
+  it should "work with string-based queries" in {
+    using (tables.users) {u =>
+      from(u)
+        .orderBy("FIELD (" +~ u.first_name +~ ", ?, ?, ?, ?" %? ("A", "B", "C", "D"))
+        .find(u.id)
+        .list
+    }
+  }
+  */
 
   "Fragments" should "work anywhere on a query" in {
     using (tables.users) {u =>
