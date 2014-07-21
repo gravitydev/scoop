@@ -1,7 +1,7 @@
 package com.gravitydev.scoop
 
 import java.sql.{ResultSet, PreparedStatement, Types, Timestamp, Date}
-import ast.{SqlNamedExpr, SqlParseExpr, SqlWrappedExpr, SqlNonNullableCol, SqlNullableCol}
+import ast.{SqlNamedExpr, SqlParseExpr, SqlWrappedExpr, SqlNonNullableCol, SqlNullableCol, SqlUnderlyingType}
 import parsers.Selection1
 
 object `package` {
@@ -41,6 +41,11 @@ object `package` {
     _ getObject _, 
     _ setObject(_,_)
   )
+
+  class CustomTypeBuilder [T,X] {
+    def apply [N](from: X=>T, to: T=>X)(implicit ev: SqlType[X] with SqlUnderlyingType[N]) = new ast.SqlWrappedType(from, to)(ev)
+  }
+  def customType [T,X] = new CustomTypeBuilder[T,X]
 
   def opt [T](p: Selection[T]): Selection1[Option[T]] = new Selection1 [Option[T]] (
     rs => p(rs).fold(_ => Right(None), x => Right(Option apply x)), 

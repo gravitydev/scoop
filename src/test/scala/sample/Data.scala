@@ -5,8 +5,8 @@ import Models._
 
 object Data {
     
-  implicit object issueStatus extends SqlCustomType [IssueStatus, Int] (IssueStatuses.forId _, _.id)
-  implicit object roleT       extends SqlCustomType [Role,String]      (Role.forName _, _.role)
+  implicit val issueStatusT = customType[IssueStatus, Int](IssueStatuses.forId _, _.id)
+  implicit val roleT        = customType[Role, String]    (Role.forName _, _.role)
 
   object tables {
  
