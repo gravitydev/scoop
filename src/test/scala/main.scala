@@ -166,6 +166,16 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
     }
   }
 
+  "A like comparison" should "work with expressions with String as their underlying type" in {
+    using (tables.users) {u =>
+      // native string
+      u.first_name like "somename"
+
+      // custom (underlying string)
+      u.role like "somerole"
+    }
+  }
+
   "Parameterized sql on select" should "work" in {
     select("?" %? 1)
   }
@@ -285,7 +295,7 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
     
 
   }
-  
+ 
   "Query API" should "work" in {
     val u = tables.users as "reporter"
     val i = tables.issues as "i"

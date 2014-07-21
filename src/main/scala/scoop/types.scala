@@ -3,6 +3,14 @@ package ast
 
 import java.sql.{ResultSet, PreparedStatement}
 
+/**
+ * Type that is used in the database
+ */
+trait SqlUnderlyingType[T]
+
+/**
+ * Type that is used in scala code
+ */
 trait SqlType[T] {
   def parse (rs: ResultSet, name: String): Option[T]
   def parse (rs: ResultSet, index: Int): Option[T]
@@ -24,7 +32,7 @@ class SqlNativeType[T] (
   getByName: (ResultSet, String) => T,
   getByIndex: (ResultSet, Int) => T,
   _set: (PreparedStatement, Int, T) => Unit
-) extends SqlType [T] {
+) extends SqlType [T] with SqlUnderlyingType[T] {
   def set (stmt: PreparedStatement, idx: Int, value: T): Unit = {
     if (value==null) stmt.setNull(idx, tpe)
     else _set(stmt, idx, value)
@@ -33,7 +41,7 @@ class SqlNativeType[T] (
   def parse (rs: ResultSet, idx: Int) = Option(getByIndex(rs, idx)) filter {_ => !rs.wasNull}
 }
 
-class SqlCustomType[T,N] (from: N => T, to: T => N)(implicit nt: SqlNativeType[N]) extends SqlType[T] {
+class SqlCustomType[T,N] (from: N => T, to: T => N)(implicit nt: SqlNativeType[N]) extends SqlType[T] with SqlUnderlyingType[N] {
   def tpe = nt.tpe
   def parse (rs: ResultSet, name: String) = nt.parse(rs, name) map from
   def parse (rs: ResultSet, idx: Int) = nt.parse(rs, idx) map from

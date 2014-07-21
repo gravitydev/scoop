@@ -42,8 +42,8 @@ trait SqlExpr [X] extends Sql {self =>
   def isNull = SqlUnaryExpr[X,Boolean](this, "IS NULL", postfix=true)
   def isNotNull = SqlUnaryExpr[X,Boolean](this, "IS NOT NULL", postfix=true)
 
-  def like (v: SqlExpr[String])(implicit ev: X =:= String) = SqlInfixExpr[Boolean](this, v, "LIKE")
-  def notLike (v: SqlExpr[String])(implicit ev: X =:= String) = SqlInfixExpr[Boolean](this, v, "NOT LIKE")
+  def like (v: SqlExpr[String])(implicit ev: SqlType[X] with SqlUnderlyingType[String]) = SqlInfixExpr[Boolean](this, v, "LIKE")
+  def notLike (v: SqlExpr[String])(implicit ev: SqlType[X] with SqlUnderlyingType[String]) = SqlInfixExpr[Boolean](this, v, "NOT LIKE")
  
   // TODO: decimals
   def + [T,N](v: SqlExpr[T])(implicit ev1: SqlExpr[X]=>SqlExpr[N], ev2: SqlExpr[T]=>SqlExpr[N], ev3: SqlType[N]) = SqlInfixExpr[N](this, v, "+")
