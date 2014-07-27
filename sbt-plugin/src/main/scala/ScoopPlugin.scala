@@ -24,12 +24,8 @@ object ScoopPlugin extends AutoPlugin {
     sourceGenerators in Compile += {
       scoopGenerate.taskValue
     },
-    scoopPackage := "data",
-    scoopJdbcUrl := "jdbc:mysql://rds1.gravitydev.com/rovitracker?characterEncoding=UTF-8",
-    scoopJdbcUsername := "rovi",
-    scoopJdbcPassword := "bamboO=ballooN",
-    //scoopIncludeTables := (_ => true), // include all tables
-    scoopIncludeTables := (_ != "play_evolutions"), // include all tables
+    scoopIncludeTables := (_ => true), // include all tables
+    //scoopIncludeTables := (_ != "play_evolutions"), // include all tables
     scoopIncludeColumns := (_ => true),
 
     scoopMapType := {(i: Int) => 
@@ -47,8 +43,8 @@ object ScoopPlugin extends AutoPlugin {
       }
     },
 
-    //scoopOverrideColumnType := PartialFunction.empty,
-    scoopOverrideColumnType := {case ("equipment", "created_date") => "org.joda.time.DateTime"},
+    scoopOverrideColumnType := PartialFunction.empty,
+    //scoopOverrideColumnType := {case ("equipment", "created_date") => "org.joda.time.DateTime"},
 
     scoopGenerate := {
       generateScoop(

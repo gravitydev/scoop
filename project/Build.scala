@@ -24,7 +24,9 @@ object ScoopBuild extends Build {
     .dependsOn(root)
     .settings(
       sbtPlugin := true,
+      organization := "com.gravitydev",
       version := "0.0.1-SNAPSHOT",
+      publishTo := Some(gravityRepo),
       libraryDependencies := Seq(
         // TODO: support other dbs
         "mysql" % "mysql-connector-java" % "5.1.30" % "compile"
