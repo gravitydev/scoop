@@ -27,9 +27,9 @@ trait SqlExpr [X] extends Sql {self =>
   def >=  (v: SqlExpr[X]) = SqlInfixExpr[Boolean](this, v, ">=")
   
   // it would be nice to have a view bound here
-  def in (v: Set[X]) = if (v.isEmpty) sql[Boolean]("false") else SqlInfixExpr[Boolean](this, SqlLiteralSetExpr(v), "IN")
+  def in (v: Set[X]) = if (v.isEmpty) query.sql[Boolean]("false") else SqlInfixExpr[Boolean](this, SqlLiteralSetExpr(v), "IN")
   
-  def notIn (v: Set[X]) = if (v.isEmpty) sql[Boolean]("true") else SqlInfixExpr[Boolean](this, SqlLiteralSetExpr(v), "NOT IN")
+  def notIn (v: Set[X]) = if (v.isEmpty) query.sql[Boolean]("true") else SqlInfixExpr[Boolean](this, SqlLiteralSetExpr(v), "NOT IN")
  
   // should I get rid of these in favor of the symbolic ones?
   def and (v: SqlExpr[Boolean])(implicit ev: SqlExpr[X] =:= SqlExpr[Boolean]) = SqlInfixExpr[Boolean](ev(this), v, "AND")
