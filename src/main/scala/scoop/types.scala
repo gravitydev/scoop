@@ -43,7 +43,7 @@ class SqlNativeType[T] (
   def parse (rs: ResultSet, idx: Int) = Option(getByIndex(rs, idx)) filter {_ => !rs.wasNull}
 }
 
-@deprecated("Use customType[T,N](...) istead", "1.0.0-alpha10")
+@deprecated("Use customType[T,N](...) istead", "1.0.0-alpha11")
 class SqlCustomType[T,N] (from: N => T, to: T => N)(implicit nt: SqlNativeType[N]) extends SqlType[T] with SqlUnderlyingType[N] {
   def tpe = nt.tpe
   def parse (rs: ResultSet, name: String) = nt.parse(rs, name) map from
