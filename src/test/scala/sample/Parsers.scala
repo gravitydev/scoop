@@ -5,7 +5,16 @@ import Models._
 import Data._
 
 object Parsers {
-  def user (u: tables.users) = u.id ~ u.first_name ~ u.last_name >> {(i,f,l) => User(i,f+" "+l)}
+  def user (u: tables.users) = 
+    u.id ~ u.first_name ~ u.last_name ~ u.role >> {(i,f,l,r) => 
+      User(i, f+" "+l, r)
+    }
+
+  // cleaner
+  def user2 (u: tables.users) = 
+    u.id ~
+    (u.first_name ~ u.last_name >> (_ + " " + _)) ~
+    u.role >> User.apply
 
   def total (count: SqlExpr[Long]) = count //>> (x => x)
  

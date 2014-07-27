@@ -109,7 +109,7 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
     }
   }
 
-  "Ordering on expressions" should "work" in {
+  "Ordering" should "work with expressions" in {
     using(tables.users) {u =>
       from(u)
         .where(u.id === 24L)
@@ -118,6 +118,17 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
         .list
     }
   }
+
+  /*
+  it should "work with string-based queries" in {
+    using (tables.users) {u =>
+      from(u)
+        .orderBy("FIELD (" +~ u.first_name +~ ", ?, ?, ?, ?" %? ("A", "B", "C", "D"))
+        .find(u.id)
+        .list
+    }
+  }
+  */
 
   "Fragments" should "work anywhere on a query" in {
     using (tables.users) {u =>
@@ -152,6 +163,16 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
       val p1: SqlExpr[Boolean] = u.first_name === "somename"
       val p2: SqlExpr[Boolean] = u.first_name like "somename"
       val p3: SqlExpr[Boolean] = u.first_name in Set("one", "two")
+    }
+  }
+
+  "A like comparison" should "work with expressions with String as their underlying type" in {
+    using (tables.users) {u =>
+      // native string
+      u.first_name like "somename"
+
+      // custom (underlying string)
+      u.role like "somerole"
     }
   }
 
@@ -274,7 +295,7 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
     
 
   }
-  
+ 
   "Query API" should "work" in {
     val u = tables.users as "reporter"
     val i = tables.issues as "i"

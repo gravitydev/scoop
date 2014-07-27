@@ -5,7 +5,8 @@ import Models._
 
 object Data {
     
-  implicit object issueStatus extends SqlCustomType [IssueStatus, Int] (IssueStatuses.forId _, _.id)
+  implicit val issueStatusT = customType[IssueStatus, Int](IssueStatuses.forId _, _.id)
+  implicit val roleT        = customType[Role, String]    (Role.forName _, _.role)
 
   object tables {
  
@@ -28,6 +29,7 @@ object Data {
       val id          = col[Long]         ('id)
       def first_name  = col[String]       ('first_name)
       def last_name   = col[String]       ('last_name)
+      def role        = col[Role]         ('role) 
       def email       = col[String]       ('email)
       def age         = col[Int]          ('age)
       def nickname    = col[String]       ('nickname) nullable

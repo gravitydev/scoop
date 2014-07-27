@@ -8,14 +8,16 @@ The main motivation is to provide a concise and practical solution that doesn't 
 
 Lots of inspiration was taken from squeryl, anorm, and the apocalisp blog.
 
+Website: https://devstack.io/scoop
+
 Installation
 ------------
 
 SBT:
 ```sbt
-resolvers += "gravity" at "https://devstack.io/repo/gravitydev/public"
+resolvers += "gravitydev" at "https://devstack.io/repo/gravitydev/public"
 
-libraryDependencies += "com.gravitydev" %% "scoop-0.2.0-SNAPSHOT"
+libraryDependencies += "com.gravitydev" %% "scoop-1.0.0-alpha9"
 ```
 
 Model Definition
@@ -88,9 +90,11 @@ object Parsers {
 // instantiate a parser by specifying the tables it should use
 // the tables can be configured with aliases
 // this makes the definition of the parser general, but the instantiation custom to the query
-val users = from(users)
-  .leftJoin(accounts on employees.manager_id === managers.id)
-  .find(Parsers.user(users, accounts))
+val users: List[User] = // type ascription optional
+  from(users)
+    .leftJoin(accounts on employees.manager_id === managers.id)
+    .find(Parsers.user(users, accounts))
+    .list
 
 ```
 
