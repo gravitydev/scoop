@@ -30,7 +30,7 @@ object ScoopPlugin extends AutoPlugin {
     scoopGenerateMaybe := Def.taskDyn {
       if (scoopFile.value.exists) Def.task{
         streams.value.log.info("Scoop meta-data already exists. Run 'clean' if you wish to re-generate from DB'")
-        Seq[File]()
+        Seq(scoopFile.value)
       }
       else Def.task(scoopGenerate.value)
     }.value,
