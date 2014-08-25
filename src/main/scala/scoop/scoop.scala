@@ -28,10 +28,17 @@ object `package` {
   implicit val sqlDate       = new SqlNativeType [Date]         (Types.DATE,      _ getDate _,      _ getDate _,       _ setDate (_,_))
   implicit val sqlBoolean    = new SqlNativeType [Boolean]      (Types.BOOLEAN,   _ getBoolean _,   _ getBoolean _,    _ setBoolean (_,_))
 
+  // must deal with null, since we are trying to map it to a scala type
   implicit val sqlDecimal    = new SqlNativeType [BigDecimal] (
     Types.DECIMAL, 
-    (rs, idx) => BigDecimal(rs.getBigDecimal(idx)), 
-    (rs, idx) => BigDecimal(rs.getBigDecimal(idx)), 
+    (rs, idx) => {
+      val res = rs.getBigDecimal(idx)
+      if (res == null) null else BigDecimal(res)
+    },
+    (rs, idx) => {
+      val res = rs.getBigDecimal(idx)
+      if (res == null) null else BigDecimal(res)
+    }, 
     (rs, idx, value) => rs.setBigDecimal(idx, value.underlying)
   )
 

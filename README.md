@@ -17,7 +17,7 @@ SBT:
 ```sbt
 resolvers += "gravitydev" at "https://devstack.io/repo/gravitydev/public"
 
-libraryDependencies += "com.gravitydev" %% "scoop-1.0.0-alpha9"
+libraryDependencies += "com.gravitydev" %% "scoop-1.0.0-alpha12"
 ```
 
 Model Definition
