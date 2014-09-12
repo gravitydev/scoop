@@ -113,6 +113,7 @@ object ScoopPlugin extends AutoPlugin {
 
     val content = 
       s"package ${pkg}\n\n" +
+      s"import scala.language.postfixOps\n" +
       s"import com.gravitydev.scoop._\n\n" +
       s"object tables {\n\n" + 
         (for ((t, cols) <- tables) yield {
