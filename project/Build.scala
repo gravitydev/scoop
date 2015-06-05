@@ -9,7 +9,7 @@ object ScoopBuild extends Build {
       organization  := "com.gravitydev",
       name          := "scoop",
       version       := "1.0.0-alpha12",
-      scalaVersion  := "2.11.1",
+      scalaVersion  := "2.11.6",
       crossScalaVersions := Seq("2.11.1", "2.10.4"),
       publishTo := Some(gravityRepo),
       libraryDependencies ++= Seq(
@@ -25,11 +25,11 @@ object ScoopBuild extends Build {
     .settings(
       sbtPlugin := true,
       organization := "com.gravitydev",
-      version := "0.0.2-SNAPSHOT",
+      version := "0.0.3-SNAPSHOT",
       publishTo := Some(gravityRepo),
       libraryDependencies := Seq(
         // TODO: support other dbs
-        "mysql" % "mysql-connector-java" % "5.1.30" % "compile"
+        "mysql" % "mysql-connector-java" % "5.1.35" % "compile"
       )	  
     )
 }
