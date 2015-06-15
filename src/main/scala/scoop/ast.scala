@@ -12,7 +12,7 @@ sealed trait Sql {
 trait SqlExpr [X] extends Sql {self =>
   implicit def sqlTpe: SqlType[X]
   
-  def params: List[SqlParam[_]]
+  def params: Seq[SqlParam[_]]
   
   def === (v: SqlExpr[X]) = SqlInfixExpr[Boolean](this, v, "=")
 
@@ -86,16 +86,16 @@ class SqlWrappedExpr [T,X:SqlType] (sqlExpr: SqlExpr[T]) extends SqlBaseExpr[X] 
  */
 case class SqlQueryExpr[I:SqlType] (query: com.gravitydev.scoop.builder.Query, expr: SqlParseExpr[I]) extends SqlExpr[I] {
   val sqlTpe = SqlType[I]
-  override def sql = "(" + util.formatSubExpr(query.sql) + ")"
-  def params = query.params
+  override def sql = "(" + util.formatSubExpr(query.rawQuery.sql) + ")"
+  def params = query.rawQuery.params
   
   def as (alias: String) = new SqlNamedQueryExpr[I](this, alias)
 }
 
-private [scoop] class SqlRawParamExpr [X:SqlType] (val sql: String, val params: List[SqlParam[_]]) extends SqlBaseExpr[X]
+private [scoop] class SqlRawParamExpr [X:SqlType] (val sql: String, val params: Seq[SqlParam[_]]) extends SqlBaseExpr[X]
 
-class SqlRawExpr[X:SqlType] (val sql: String, val params: List[SqlParam[_]] = Nil) extends SqlBaseExpr[X]
-class SqlRawOptExpr[X:SqlType] (val sql: String, val params: List[SqlParam[_]] = Nil) extends SqlOptParseExpr[X] {
+class SqlRawExpr[X:SqlType] (val sql: String, val params: Seq[SqlParam[_]] = Nil) extends SqlBaseExpr[X]
+class SqlRawOptExpr[X:SqlType] (val sql: String, val params: Seq[SqlParam[_]] = Nil) extends SqlOptParseExpr[X] {
   val sqlTpe = SqlType[X]
 }
 
@@ -162,7 +162,7 @@ sealed abstract class SqlCol[T:SqlType] (val cast: Option[String], table: SqlTab
 
   def sql = table._alias + "." + columnName + cast.map(_=>"::varchar").getOrElse("") // TODO: use correct base type
 
-  def expressions: List[query.SelectExprS] // = List( new query.SelectExprS(sql + " as " + name) )
+  def expressions: List[builder.SelectExpr] // = List( new query.SelectExprS(sql + " as " + name) )
 }
 
 class SqlNonNullableCol[T:SqlType](val columnName: String, cast: Option[String], table: SqlTable[_], explicitAlias: String = null) 

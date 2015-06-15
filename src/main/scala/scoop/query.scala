@@ -23,29 +23,25 @@ object `package` {
   // kind of hacky 
   implicit def intToLongExpr (a: SqlExpr[Int]): SqlExpr[Long] = new SqlWrappedExpr[Int,Long](a)(sqlLong)
 
-  implicit def fragmentToQueryS (s: SqlFragmentS) = new QueryS(s.sql, s.params)
+  implicit def fragmentToQueryS (s: SqlFragmentS) = new RawQuery(s.sql, s.params)
 
   implicit def baseToSqlLit [T](base: T)(implicit sqlType: SqlType[T]): SqlParseExpr[T] = SqlLiteralExpr(base)
   implicit def tableToWrapped [T <: Table[_]] (t: T) = new TableOps(t)
   implicit def optToSqlLit [T](base: Option[T])(implicit sqlType: SqlType[T]) = base map {x => SqlLiteralExpr(x)}
   implicit def baseToParam [T](base: T)(implicit sqlType: SqlType[T]) = SqlSingleParam(base)
 
-  implicit def queryToQueryS (q: builder.Query)           = new QueryS(q.sql, q.params)
+  implicit def queryToQueryS (q: builder.Query) = q.rawQuery
   
-  //implicit def listToExpr (l: List[String]): List[ExprS] = l.map(x => x: ExprS)
   implicit def companionToTable [T <: Table[T]] (companion: {def apply (): T}): T = companion()
   implicit def sqlToFragment (s: SqlS) = new SqlFragmentS(s.sql, s.params)
 
-  //implicit def 
-
-  // should these be in the functions package?
   def exists [T:SqlType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "EXISTS", postfix=false)
   def notExists [T:SqlType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "NOT EXISTS", postfix=false) 
 
   // starting point
   def from (table: builder.From) = Query(Some(table))
   def where (pred: ast.SqlExpr[Boolean]) = Query(None, predicate = Some(pred))
-  def select (cols: SelectExprS*): Query = Query(None, sel = cols.toList)
+  def select (cols: builder.SelectExpr*): Query = Query(None, sel = cols.toList)
   def insertInto (table: Table[_]) = new InsertBuilder(table._tableName)
   def update (table: builder.TableT) = new UpdateBuilder(table)
   def deleteFrom (table: builder.TableT) = new DeleteBuilder(table)
@@ -61,7 +57,7 @@ object `package` {
  
   
   // necessary anymore?
-  def subquery [T:SqlType] (q: QueryS): SqlExpr[T] = new SqlRawParamExpr("("+q.sql+")", q.params)
+  def subquery [T:SqlType] (q: RawQuery): SqlExpr[T] = new SqlRawParamExpr("("+q.sql+")", q.params)
 
   // safe aliasing
   private class Aliaser {
@@ -81,7 +77,7 @@ object `package` {
     
   private [this] def aliasing [T](fn: Aliaser => T) = fn(new Aliaser)
 
-  def executeQuery [B](query: QueryS)(rowParser: ResultSet => ParseResult[B])(implicit c: Connection): Iterator[B] = try {
+  def executeQuery [B](query: RawQuery)(rowParser: ResultSet => ParseResult[B])(implicit c: Connection): Iterator[B] = try {
     val statement = c.prepareStatement(query.sql)
     for ((p, idx) <- query.params.zipWithIndex) p(statement, idx+1)
     val rs = statement.executeQuery()

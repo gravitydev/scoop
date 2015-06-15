@@ -1,7 +1,7 @@
 package com.gravitydev.scoop
 package builder
 
-import com.gravitydev.scoop.query.{SqlS, QueryS, stringToFragment, executeQuery}
+import com.gravitydev.scoop.query.{SqlS, RawQuery, stringToFragment, executeQuery}
 import com.gravitydev.scoop.util.QueryResult
 import java.sql.{Connection, ResultSet}
 
@@ -20,7 +20,14 @@ object Assignment {
   implicit def fromOption [T](a: Option[ast.SqlAssignment[T]]): Assignment = a.map(x => fromSqlAssignment(x)) getOrElse null
 }
 
-class From (queryable: String, val params: List[SqlParam[_]] = Nil) {
+/** Might be aliased */
+class SelectExpr (val sql: String, val params: Seq[SqlParam[_]] = Nil)
+object SelectExpr {
+  implicit def fromNamed (expr: ast.SqlNamedExpr[_,_]) = new SelectExpr(expr.selectSql, expr.params)
+  implicit def fromExpr (expr: ast.SqlExpr[_]) = new SelectExpr(expr.sql, expr.params)
+}
+
+class From (queryable: String, val params: Seq[SqlParam[_]] = Nil) {
   val sql = "FROM " + queryable
 }
 object From {
@@ -116,7 +123,7 @@ case class Insert2 (
   comment: Option[String] = None
 ) extends InsertBase {
   def comment (c: String): Insert2 = copy(comment = Some(c))
-  def params: List[SqlParam[_]] = assignments.foldLeft(List[SqlParam[_]]()){(a,b) => a ++ b.params}
+  def params: Seq[SqlParam[_]] = assignments.flatMap(_.params)
   def sql: String = "INSERT INTO " + into + " (" + assignments.map(_.col.columnName).mkString(", ") + ") VALUES (" + assignments.map(_.valueSql).mkString(", ") + ")"
 }
 
@@ -142,7 +149,7 @@ case class Insert3 (
   comment: Option[String] = None
 ) extends InsertBase {
   def comment (c: String): Insert3 = copy(comment = Some(c))
-  def params: List[SqlParam[_]] = query.params 
+  def params: Seq[SqlParam[_]] = query.params 
   def sql: String = "INSERT INTO " + into + " (" + columns.map(_.columnName).mkString(", ") + ")\n" + query.sql
 }
 
@@ -187,11 +194,11 @@ case class Delete (
 
 case class Query (
   from:         Option[From],
-  sel:          Seq[query.SelectExprS]    = Nil,
+  sel:          Seq[SelectExpr]    = Nil,
   joins:        Seq[Join]    = Nil,
   predicate:    Option[ast.SqlExpr[Boolean]]  = None,
-  order:        Option[SqlS]  = None,
-  group:        List[SqlS]    = Nil,
+  order:        Seq[SqlOrdering]  = Nil,
+  group:        Seq[ast.SqlExpr[_]]    = Nil,
   limit:        Option[Int]           = None,
   offset:       Option[Int]           = None,
   comment:      Option[String]        = None,
@@ -200,12 +207,12 @@ case class Query (
 ) {
 
   // single expr, useful to have it typed for subqueries
-  def select [I](expr: ast.SqlNamedExpr[I,I]): ast.SqlQueryExpr[I] = ast.SqlQueryExpr[I](select(expr: query.SelectExprS), expr)(expr.sqlTpe)
+  def select [I](expr: ast.SqlNamedExpr[I,I]): ast.SqlQueryExpr[I] = ast.SqlQueryExpr[I](select(expr: SelectExpr), expr)(expr.sqlTpe)
 
-  def select (exprs: query.SelectExprS*): Query = copy(sel = exprs.toList)
+  def select (exprs: SelectExpr*): Query = copy(sel = exprs.toList)
 
-  def forUpdate ()            = copy(forUpdateLock = true)
-  def selectDistinct (exprs: query.SelectExprS*) = copy(sel = exprs, distinct=true)
+  def forUpdate () = copy(forUpdateLock = true)
+  def selectDistinct (exprs: SelectExpr*) = copy(sel = exprs, distinct=true)
   // TODO: remove?
   //def addCols (cols: query.ExprS*)  = copy(sel = sel ++ cols)
   def innerJoin (join: JoinBuilder) = copy(joins = joins ++ List(join.build(JoinType.Inner)))
@@ -214,73 +221,27 @@ case class Query (
   // always append? we'll go with that for now
   def where (pred: ast.SqlExpr[Boolean]) = copy(predicate = predicate.map(_ && pred).orElse(Some(pred)))
 
-  def orderBy (order: SqlOrdering*) = copy(
-    order = Some( 
-      order.toList.map(_.sql).mkString(", ") %? (order.foldLeft(List[SqlParam[_]]())((a,b) => a ++ b.params):_*)
-    )
-  )
-  def groupBy (cols: ast.SqlExpr[_]*) = copy(
-    group = cols.map(x => x: query.SqlFragmentS).toList
-  )
+  def orderBy (order: SqlOrdering*) = copy(order = this.order ++ order)
+  def groupBy (cols: ast.SqlExpr[_]*) = copy(group = cols)
   def limit (l: Int): Query = copy(limit = Some(l))
   def offset (o: Int): Query = copy(offset = Some(o))
   def comment (c: String): Query = copy(comment = Some(c))
   
   def as (alias: String) = new ast.SqlNamedQuery(this, alias) 
 
-  private def optSql(prefix: String, x: Option[SqlS]) = 
-    x map (prefix +~ _ +~ "\n") getOrElse ("" +~ "")
+  lazy val rawQuery = printer.Printer.toRawQuery(this)
 
-  private def listSql (prefix: String, x: Seq[SqlS], delimiter: String = "") = 
-    ifStr(x.nonEmpty)(prefix) +~ x.reduceLeftOption(_ +~ delimiter +~ " \n" +~ _ ).getOrElse("" +~ "") +~ " \n"
-
-  // Monoid append would be nice
-  private def ifStr (cond: Boolean)(subj: String) = (if (cond) subj else "")
-
-  private lazy val selectSql = listSql("SELECT " + ifStr(distinct)("DISTINCT "), sel, ",")
-
-  private lazy val fromSql = optSql("", from.map(f => new SqlS(f.sql, f.params)))
-
-  private lazy val joinsSql = listSql("", joins.map(j => new SqlS(j.sql, j.params)))
-
-  private lazy val whereSql = optSql("WHERE ", predicate.map(pred => new SqlS(pred.sql, pred.params)))
-
-  private lazy val groupBySql = listSql("GROUP BY ", group, ", ")
-
-  private lazy val orderBySql = optSql("ORDER BY ", order)
-
-  private lazy val limitSql = optSql("LIMIT ", limit map (_.toString))
-
-  private lazy val offsetSql = optSql("OFFSET ", offset map (_.toString))
-
-  lazy val statement = 
-    comment.map(c => "/* " + c + "*/ \n").getOrElse("") +~
-    selectSql +~ 
-    fromSql +~
-    joinsSql +~
-    whereSql +~
-    groupBySql +~
-    orderBySql +~
-    limitSql +~
-    offsetSql +~
-    (ifStr(forUpdateLock)("FOR UPDATE \n"))
-  
-  lazy val sql: String = {
-    statement.sql
-  }
-
-  lazy val params: List[SqlParam[_]] = statement.params
-
-  def process [B](rowParser: ResultSet => ParseResult[B])(implicit c: Connection): QueryResult[B] = new QueryResult(executeQuery(new QueryS(sql, params))(rowParser))
+  def process [B](rowParser: ResultSet => ParseResult[B])(implicit c: Connection): QueryResult[B] = 
+    new QueryResult(executeQuery(new RawQuery(printer.Printer.getSql(this), printer.Printer.getParams(this)))(rowParser))
 
   def find [B](selection: Selection[B])(implicit c: Connection): QueryResult[B] = select(selection.expressions:_*) process selection
   def findDistinct [B](selection: Selection[B])(implicit c: Connection): QueryResult[B] = selectDistinct(selection.expressions:_*) process selection
 
   override def toString = {
-    "Query(sql="+sql+", params=" + renderParams(params) +")"
+    "Query(sql="+rawQuery.sql+", params=" + renderParams(rawQuery.params) +")"
   }
 
-  def union (q: QueryS) = (sql + "\n UNION \n" + q.sql) onParams (params ++ q.params :_*)  
+  def union (q: RawQuery) = rawQuery union q  
 }
 
 case class OrderBy (order: String, dir: String = null) {

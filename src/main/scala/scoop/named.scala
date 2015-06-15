@@ -1,7 +1,7 @@
 package com.gravitydev.scoop
 package ast
 
-import builder.{Query, Join}
+import builder.{Query, Join, SelectExpr}
 import query.stringToFragment
 import java.sql.ResultSet
 
@@ -12,7 +12,7 @@ import java.sql.ResultSet
 trait SqlNamed {
   def name: String
   def sql: String
-  def params: List[SqlParam[_]] 
+  def params: Seq[SqlParam[_]] 
 }
 
 /** Typed parseable sql expression */
@@ -23,11 +23,11 @@ trait SqlNamedExpr [I,+O] extends SqlExpr[I] with SqlNamed with parsers.ExprSele
 
   def name: String
   def sql: String
-  def params: List[SqlParam[_]]
+  def params: Seq[SqlParam[_]]
 
   def selectSql = sql + " as " + name
 
-  def expressions = List(new query.SelectExprS(selectSql, params))
+  def expressions = List(new SelectExpr(selectSql, params))
 
   // this should only be applicable to sub-queries
   def apply [X:SqlType](column: String) = new SqlRawExpr[X](name+"."+column)
@@ -38,7 +38,7 @@ trait SqlNamedExpr [I,+O] extends SqlExpr[I] with SqlNamed with parsers.ExprSele
 trait SqlNamedStrictExpr [T] extends SqlNamedExpr[T,T]
 trait SqlNamedOptExpr [T] extends SqlNamedExpr[T,Option[T]] 
 
-private [scoop] class SqlNamedExprImpl [T:SqlType] (val name: String, exprSql: String, val params: List[SqlParam[_]]) 
+private [scoop] class SqlNamedExprImpl [T:SqlType] (val name: String, exprSql: String, val params: Seq[SqlParam[_]]) 
     extends SqlExpr[T] with SqlNamedStrictExpr[T] with Selection[T] {self =>
   val sqlTpe = SqlType[T]
 
@@ -49,7 +49,7 @@ private [scoop] class SqlNamedExprImpl [T:SqlType] (val name: String, exprSql: S
   def parse (rs: ResultSet): Option[T] = SqlType[T].parse(rs, name)
 }
 
-private [scoop] class SqlOptNamedExprImpl[T:SqlType] (val name: String, exprSql: String, val params: List[SqlParam[_]])
+private [scoop] class SqlOptNamedExprImpl[T:SqlType] (val name: String, exprSql: String, val params: Seq[SqlParam[_]])
     extends SqlExpr[T] with SqlNamedOptExpr[T] with Selection[Option[T]] {self =>
 
   val sqlTpe = SqlType[T]
@@ -76,8 +76,8 @@ private [scoop] class SqlNamedQueryExpr[I:SqlType] (queryExpr: SqlQueryExpr[I], 
 
 /** Named query (untyped) */
 private [scoop] class SqlNamedQuery (val query: Query, val name: String) extends SqlNamed {
-  val sql = "(" + query.sql + ") as " + name
-  val params = query.params
+  val sql = "(" + query.rawQuery.sql + ") as " + name
+  val params = query.rawQuery.params
 
   // generate a column alias
   def apply [X:SqlType](column: String) = new SqlRawExpr[X](name+"."+column)

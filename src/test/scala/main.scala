@@ -57,10 +57,35 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
  
   "IS NOT NULL" should "work" in {
     using (tables.users) {u =>
-      from(u)
-        .where(u.email.isNotNull)
+      deleteFrom(u)
+        .where(u.email === "some@email.com")()
+
+      insertInto(u)
+        .set(
+          u.first_name := "James",
+          u.last_name := "X",
+          u.email := "some@email.com",
+          u.age := 20
+        )()
+
+      update(u)
+        .set(u.nickname := Some("dude"))
+        .where(u.id === 1)()
+
+      val res = from(u)
+        .where(u.nickname.isNotNull)
         .find(u.email)
         .list
+
+      update(u)
+        .set(u.nickname := None)
+        .where(u.id === 1)()
+
+      deleteFrom(u)
+        .where(u.email === "some@email.com")()
+    
+      res
+
     } should be (List("simplepic@gmail.com"))
   }
 
@@ -79,13 +104,26 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
     import functions._
 
     coalesce(1, 0).as("total") should matchSelectSql("COALESCE(?, ?) as total", 1, 0)
-    select(count(1).as("total"), 4 as "num") should matchSql("SELECT COUNT(?) as total, ? as num", 1, 4)
-    select(coalesce(countDistinct(1), 0L) as "total", 4 as "num") should matchSql("SELECT COALESCE(COUNT(DISTINCT ?), ?) as total, ? as num", 1, 0, 4)
+
+    select(
+      count(1).as("total"), 
+      4 as "num"
+    ).rawQuery should matchSql("SELECT COUNT(?) as total, ? as num", 1, 4)
+
+    select(
+      coalesce(countDistinct(1), 0L) as "total", 
+      4 as "num"
+    ).rawQuery should matchSql("SELECT COALESCE(COUNT(DISTINCT ?), ?) as total, ? as num", 1, 0, 4)
 
     using (tables.users as "u") {u =>
       (coalesce(u.id, 0L) as "v") should matchSelectSql("COALESCE(u.id, ?) as v", 0L)
 
-      from(u).find(coalesce(countDistinct(u.id), 0L).as("total")).head should be (1)
+      from(u)
+        .where(u.email === "simplepic@gmail.com")
+        .find(
+          coalesce(countDistinct(u.id), 0L) as "total"
+        )
+        .head should be (1)
     }
   }
 
@@ -180,7 +218,7 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
   }
 
   "Parameterized sql on select" should "work" in {
-    select("?" %? 1)
+    select(sqlExpr[Int]("?" %? 1))
   }
 
   "Group By clause" should "work" in {
@@ -323,15 +361,11 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
       i.status      := IssueStatuses.Open
     )
 
-    //println(x.sql)
-
     val z = insertInto(i).set(
       i.item_id     := 24,
       i.project_id  := 27,
       i.status      := IssueStatuses.Open
     )
-
-    //println(z.sql)
 
     val assignee: Option[Long] = Option(1L)
   
@@ -341,9 +375,6 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
         i.assigned_to := assignee
       )
       .where(i.item_id === 24)
-
-    //println(y.sql)
-
 
     val vx = from(i)
       .select( (sqlExpr[Int]("1").as("test") >> {x => x}).expressions:_* )

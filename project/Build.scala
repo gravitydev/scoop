@@ -13,8 +13,12 @@ object ScoopBuild extends Build {
       crossScalaVersions := Seq("2.11.1", "2.10.4"),
       publishTo := Some(gravityRepo),
       libraryDependencies ++= Seq(
+        "com.googlecode.kiama" %% "kiama" % "2.0.0-SNAPSHOT",
         "org.scalatest" %% "scalatest" % "2.1.6" % "test",
         "mysql"         % "mysql-connector-java"  % "5.1.30"  % "test"
+      ),
+      resolvers ++= Seq(
+        "nexus" at "https://oss.sonatype.org/content/repositories/snapshots"
       ),
       scalacOptions ++= Seq("-deprecation","-unchecked"/*,"-XX:-OmitStackTraceInFastThrow"*/),
       testOptions in Test += Tests.Argument("-oF")

@@ -2,7 +2,7 @@ package com.gravitydev.scoop
 package parsers
 
 import ast.SqlType
-import query.SelectExprS
+import builder.SelectExpr
 import java.sql.ResultSet
 
 object `package` {
@@ -36,7 +36,7 @@ class ExprParser [+T:SqlType] (name: String) extends Selection1[T] (
 // BOILERPLATE
 abstract class SelectionX [+T] (selectors: Selection[_]*) extends SP[T] {
   def list: List[Selection[_]] = selectors.toList
-  def expressions = list.foldLeft(List[query.SelectExprS]())((l,p) => l ++ p.expressions)
+  def expressions = list.flatMap(_.expressions) 
   override def toString = list.map((x: AnyRef) => x.toString).mkString(" ~ ")
 }
 
@@ -45,7 +45,7 @@ trait ExprSelection [+A] extends Selection[A] {self: ast.SqlNamedExpr[_,A] =>
   def ~ [X](px: SP[X]): Selection2[A,X] = new Selection2(this, px)
 }
 
-class Selection1 [+A] (fn: ResultSet => ParseResult[A], val expressions: List[query.SelectExprS] = Nil) extends SP[A] {
+class Selection1 [+A] (fn: ResultSet => ParseResult[A], val expressions: List[builder.SelectExpr] = Nil) extends SP[A] {
   def >> [T](fn: A=>T) = new Selection1(apply(_) map fn, expressions)
   def ~ [X](px: SP[X]): Selection2[A,X] = new Selection2(this, px)
   def apply (rs: ResultSet): ParseResult[A] = fn(rs)

@@ -94,7 +94,7 @@ object `package` {
  */
 trait Selection [+T] extends (ResultSet => ParseResult[T]) with parsers.ResultSetParserFlatMap[T] {self =>
   def map [X] (fn: T => X): Selection[X] = new parsers.MappedSelection(self, fn)
-  def expressions: List[query.SelectExprS]
+  def expressions: List[builder.SelectExpr]
 }
 
 sealed trait SqlParam [T] {

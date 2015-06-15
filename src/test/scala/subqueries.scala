@@ -15,11 +15,9 @@ class SubqueriesSpec extends FlatSpec with ShouldMatchers {
     using (tables.users) {u =>
       update(u).set(u.age := 30)()
 
-      val sub = from(u).select(u.age as "age")
+      val sub = from(u).limit(1).select(u.age as "age")
     
       sub as "a"
-
-      println(sub)
 
       from(u)
         .find(
