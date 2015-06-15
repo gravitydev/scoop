@@ -101,7 +101,10 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
         )
         .onDuplicateKeyUpdate(u.age := u.age + 2)()
 
-      from(u).where(u.id === 1).find(u.age).head should be (32)
+      from(u)
+        .where(u.id === 1)
+        .find(u.age)
+        .head should be (32)
 
       update(u)
         .set(u.age := 30) 
@@ -132,9 +135,9 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
 
   "Fragments" should "work anywhere on a query" in {
     using (tables.users) {u =>
-      val ids: List[Long] = from("users u")
-        .where("u.id = ?" %? 1)
-        .find(sql[Long]("u.id" +~ "").as("id"))
+      val ids: List[Long] = from(u as "u")
+        .where(sqlExpr[Boolean]("u.id = ?" %? 1))
+        .find(sqlExpr[Long]("u.id" +~ "").as("id"))
         .list
     }
   }
@@ -226,8 +229,8 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
   }
 
   "Random stuff" should "work" in {
-    val s = select("'hello'")
-    val xx = sql[scala.math.BigDecimal]("SOMETHING").as("SOMETHING2").expressions
+    val s = select(sqlExpr[String]("'hello'").as("a"))
+    val xx = sqlExpr[scala.math.BigDecimal]("SOMETHING").as("SOMETHING2").expressions
 
     val u = tables.users as "reporter"
     val i = tables.issues as "i"
@@ -241,14 +244,18 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
     }
 
     {
-      val q = from(u).where("u.id IN (" +~ from(u).where(u.id === 2) +~ ")")
+      val q = 
+        from(u)
+          .where(
+            sqlExpr[Boolean]("u.id IN (" +~ from(u).where(u.id === 2) +~ ")")
+          )
     }     
 
     val userP = Parsers.user(u)
 
     val comb = userP ~ i.id
  
-    val xparser = i.id ~ userP ~ sql[Long]("(SELECT 1)").as("test")
+    val xparser = i.id ~ userP ~ sqlExpr[Long]("(SELECT 1)").as("test")
 
     val testParser = i.id ~ xparser
     val qq = from(i) select(testParser.expressions:_*) 
@@ -288,7 +295,9 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
     val q = from(i)
       .innerJoin (u on i.reported_by === u.id)
       //.where (u.first_name === "alvaro" and i.status === IssueStatuses.Open and i.status === 24)
-      .where("reporter.last_name = ?" %? "carrasco")
+      .where(
+        sqlExpr[Boolean]("reporter.last_name = ?" %? "carrasco")
+      )
       .orderBy (u.first_name desc, u.last_name asc)
      
     q find issueParser
@@ -337,7 +346,7 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
 
 
     val vx = from(i)
-      .select( (sql[Int]("1").as("test") >> {x => x}).expressions:_* )
+      .select( (sqlExpr[Int]("1").as("test") >> {x => x}).expressions:_* )
     
   }
 

@@ -1,7 +1,8 @@
 package com.gravitydev.scoop
 package ast
 
-import query.{Query, Join}
+import builder.{Query, Join}
+import query.stringToFragment
 import java.sql.ResultSet
 
 /** 
@@ -70,7 +71,7 @@ private [scoop] class SqlNamedQueryExpr[I:SqlType] (queryExpr: SqlQueryExpr[I], 
 
   def parse (rs: ResultSet) = SqlType[I].parse(rs, name)
   
-  def on (pred: SqlExpr[Boolean]) = query.Join(selectSql, pred.sql, params ++ pred.params)
+  def on (pred: SqlExpr[Boolean]) = new builder.JoinBuilder(selectSql %? (params:_*), pred)
 }
 
 /** Named query (untyped) */
@@ -83,6 +84,6 @@ private [scoop] class SqlNamedQuery (val query: Query, val name: String) extends
   def apply [X](col: ast.SqlNamedOptExpr[X]): ast.SqlNamedOptExpr[X] = new ast.SqlRawOptExpr[X](name+"."+col.name)(col.sqlTpe).as(col.name)
   def apply [X](col: ast.SqlNamedStrictExpr[X]): ast.SqlNamedStrictExpr[X] = new ast.SqlRawExpr[X](name+"."+col.name)(col.sqlTpe).as(col.name)
 
-  def on (pred: SqlExpr[Boolean]) = Join(sql, pred.sql, params ++ pred.params)
+  def on (pred: SqlExpr[Boolean]) = new builder.JoinBuilder(sql, pred)
 }
 

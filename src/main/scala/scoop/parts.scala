@@ -10,9 +10,6 @@ import ast.{SqlType, SqlNamedExpr, SqlNamedExprImpl, SqlRawExpr, SqlNullableCol,
 sealed class SqlS (val sql: String, val params: List[SqlParam[_]] = Nil) {
   override def toString = getClass.getName + "(sql="+sql+", params="+params+")" 
 }
-object SqlS {
-  implicit def fromExpr(expr: ast.SqlExpr[_]) = new SqlS(expr.sql, expr.params)
-}
 
 /**
  * A portion of a query that can be appended to another
@@ -38,65 +35,18 @@ class AliasedSqlFragmentS (_sql: String, val name: String, params: List[SqlParam
     params  = col.params
   )
 
-  def on (pred: ast.SqlExpr[Boolean]) = Join(selectSql, pred.sql, params ++ pred.params)
-}
-
-// TODO: is this even necessary anymore?
-class ExprS (s: String, params: List[SqlParam[_]] = Nil) extends SqlFragmentS(s, params) 
-object ExprS {
-  implicit def fromExpr (expr: ast.SqlExpr[_]) = new ExprS(expr.sql, expr.params)
-  implicit def fromString (s: String)       = new ExprS(s)
-  implicit def fromCol (col: ast.SqlCol[_]) = new ExprS(col.sql)
+  def on (pred: ast.SqlExpr[Boolean]) = new builder.JoinBuilder(selectSql, pred)
 }
 
 /**
- * Same as ExprS, but it might be aliased
+ * Might be aliased
  */
 class SelectExprS     (s: String, params: List[SqlParam[_]] = Nil) extends SqlS(s, params)
 object SelectExprS {
-  implicit def fromString (s: String)           = new SelectExprS(s)
   implicit def fromFragment (s: SqlFragmentS)   = new SelectExprS(s.sql, s.params)
   implicit def fromNamed (expr: ast.SqlNamedExpr[_,_]) = new SelectExprS(expr.selectSql, expr.params)
-  implicit def fromExprS (expr: ExprS)          = new SelectExprS(expr.sql, expr.params)
+  implicit def fromExpr (expr: ast.SqlExpr[_]) = new SelectExprS(expr.sql, expr.params)
 }
-
-class FromS (s: String, params: List[SqlParam[_]] = Nil) extends SqlS(s, params) 
-object FromS {
-  implicit def fromString (s: String) = new FromS(s)
-  implicit def fromTable (t: ast.SqlTable[_]) = new FromS(t.sql)
-  implicit def fromNamedQuery (q: ast.SqlNamedQuery) = new FromS(q.sql, q.params)
-  implicit def fromAliasedSql (q: AliasedSqlFragmentS) = new FromS(q.sql, q.params)
-}
-
-class UpdateQueryableS (s: String) extends SqlS(s)
-object UpdateQueryableS {
-  implicit def fromTable(t: ast.SqlTable[_]) = new UpdateQueryableS(t.sql)
-}
-
-class JoinS (s: String, params: List[SqlParam[_]]) extends SqlS(s, params)
-object JoinS {
-  implicit def strToJoin (s: String)         = new JoinS(s, Nil)
-  implicit def fromJoin (j: Join)            = new JoinS(j.sql, j.params)
-  //implicit def fromAliasSqlFragmentS (s: AliasedSqlFragmentS) = new JoinS(s.selectSql, s.params)
-}
-
-class PredicateS (s: String, params: List[SqlParam[_]]) extends SqlS(s, params)
-object PredicateS {
-  implicit def fromFragment (f: SqlFragmentS) = new PredicateS(f.sql, f.params)
-  implicit def fromString (s: String)    = new PredicateS(s, Nil)
-  implicit def fromPredicate (pred: SqlExpr[Boolean]) = new PredicateS(pred.sql, pred.params)
-  implicit def fromQueryS (p: QueryS) = new PredicateS(p.sql, p.params)
-}
-
-
-class OrderByS   (s: String, params: List[SqlParam[_]]) extends SqlS(s, params)
-object OrderByS {
-  implicit def fromExpr(expr: ast.SqlExpr[_]) = fromOrdering(expr.asc)
-  implicit def fromOrdering(ord: ast.SqlOrdering) = new OrderByS(ord.sql, ord.params)
-  implicit def fromString (s: String)        = new OrderByS(s, Nil)
-  
-}
-class AssignmentS (s: String, params: List[SqlParam[_]]) extends SqlS(s, params)
 
 /**
  * A query as a string, ready to be executed 

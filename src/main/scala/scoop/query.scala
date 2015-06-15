@@ -5,7 +5,8 @@ import java.sql.{Connection, Date, Timestamp, ResultSet}
 import scala.collection.mutable.ListBuffer
 import util.{ResultSetIterator, QueryResult}
 import scala.collection._, 
-  ast.{SqlAssignment, SqlType, SqlParseExpr, SqlLiteralExpr, SqlCol, SqlRawExpr, SqlNamedExpr, SqlRawParamExpr, SqlWrappedExpr}
+  ast.{SqlType, SqlParseExpr, SqlLiteralExpr, SqlCol, SqlRawExpr, SqlNamedExpr, SqlRawParamExpr, SqlWrappedExpr}
+import builder.{DeleteBuilder, Join, Query, InsertBuilder, UpdateBuilder}
 
 class ColumnParser (name: String)
 
@@ -29,28 +30,35 @@ object `package` {
   implicit def optToSqlLit [T](base: Option[T])(implicit sqlType: SqlType[T]) = base map {x => SqlLiteralExpr(x)}
   implicit def baseToParam [T](base: T)(implicit sqlType: SqlType[T]) = SqlSingleParam(base)
 
-  implicit def assignmentToAssignmentS (a: SqlAssignment[_]) = new AssignmentS(a.sql, a.params)
-  implicit def optionalAssignmentToAssignmentS (a: Option[SqlAssignment[_]]) = a map assignmentToAssignmentS getOrElse new AssignmentS("",Nil)
-  implicit def queryToQueryS (q: Query)           = new QueryS(q.sql, q.params)
+  implicit def queryToQueryS (q: builder.Query)           = new QueryS(q.sql, q.params)
   
-  implicit def listToExpr (l: List[String]): List[ExprS] = l.map(x => x: ExprS)
+  //implicit def listToExpr (l: List[String]): List[ExprS] = l.map(x => x: ExprS)
   implicit def companionToTable [T <: Table[T]] (companion: {def apply (): T}): T = companion()
   implicit def sqlToFragment (s: SqlS) = new SqlFragmentS(s.sql, s.params)
+
+  //implicit def 
 
   // should these be in the functions package?
   def exists [T:SqlType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "EXISTS", postfix=false)
   def notExists [T:SqlType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "NOT EXISTS", postfix=false) 
 
   // starting point
-  def from (table: FromS) = Query(Some(table))
-  def where (pred: PredicateS) = Query(None, predicate = Some(pred))
+  def from (table: builder.From) = Query(Some(table))
+  def where (pred: ast.SqlExpr[Boolean]) = Query(None, predicate = Some(pred))
   def select (cols: SelectExprS*): Query = Query(None, sel = cols.toList)
   def insertInto (table: Table[_]) = new InsertBuilder(table._tableName)
-  def update (table: UpdateQueryableS) = new UpdateBuilder(table)
-  def deleteFrom (table: UpdateQueryableS) = new DeleteBuilder(table)
+  def update (table: builder.TableT) = new UpdateBuilder(table)
+  def deleteFrom (table: builder.TableT) = new DeleteBuilder(table)
 
-  def sql [T:SqlType] (sql: String): SqlParseExpr[T] = new SqlRawExpr[T](sql, Nil)
-  def sql [T:SqlType] (sql: SqlS): SqlParseExpr[T] = new SqlRawExpr[T](sql.sql, sql.params)
+  @deprecated("Use sqlExpr", "1.0") 
+  def sql [T:SqlType] (sql: String): SqlParseExpr[T] = sqlExpr(sql)
+
+  @deprecated("Use sqlExpr", "1.0")
+  def sql [T:SqlType] (sql: SqlS): SqlParseExpr[T] = sqlExpr(sql)
+
+  def sqlExpr [T:SqlType] (sql: String): SqlParseExpr[T] = new SqlRawExpr[T](sql, Nil)
+  def sqlExpr [T:SqlType] (sql: SqlS): SqlParseExpr[T] = new SqlRawExpr[T](sql.sql, sql.params)
+ 
   
   // necessary anymore?
   def subquery [T:SqlType] (q: QueryS): SqlExpr[T] = new SqlRawParamExpr("("+q.sql+")", q.params)
@@ -111,236 +119,6 @@ object `package` {
 }
 
 class TableOps [T <: Table[_]](t: T) {
-  def on (pred: SqlExpr[Boolean]) = Join(t.sql, pred.sql, pred.params)
-}
-
-case class Join (table: String, predicate: String, params: List[SqlParam[_]]) {
-  def sql: String = table + " ON " + predicate
-}
-
-class InsertBuilder (into: String) {
-  def set (assignments: AssignmentS*) = Insert (into, assignments.map(_.sql).filter(_.nonEmpty).toList, assignments.foldLeft(List[SqlParam[_]]()){(a,b) => a ++ b.params})
-  def values (assignments: SqlAssignment[_]*) = Insert2(into, assignments.filter(_.sql.nonEmpty).toList)
-  def apply (columns: SqlCol[_]*) = new InsertBuilder2(into, columns.toList)
-}
-class InsertBuilder2 (into: String, columns: List[SqlCol[_]]) {
-  def values (sql: SqlS) = Insert3(into, columns, sql)
-}
-
-class UpdateBuilder (tb: UpdateQueryableS) {
-  def set (assignments: AssignmentS*) = Update (tb.sql, assignments.map(_.sql).filter(_.nonEmpty).toList, None, assignments.foldLeft(List[SqlParam[_]]()){(a,b) => a ++ b.params})
-}
-
-class DeleteBuilder (tb: UpdateQueryableS) {
-  def where (pred: PredicateS) = new Delete(tb.sql, pred.sql, params = pred.params)
-}
-
-sealed trait InsertBase {
-  def params: List[SqlParam[_]]
-  def sql: String
-  def apply ()(implicit c: Connection) = try {
-    import java.sql.Statement
-    util.using(c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {stmt => 
-      for ((p, idx) <- params.zipWithIndex) p(stmt, idx+1)
-      stmt.executeUpdate()
-
-      // TODO: this is a hack, do this right
-      try util.using(stmt.getGeneratedKeys()) {rs =>
-        rs.next()
-        Some(rs.getLong(1))
-      } catch {
-        case _:Throwable => None
-      }
-    }
-  } catch {
-    case e: java.sql.SQLException => throw new Exception("SQL Exception ["+e.getMessage+"] when executing query ["+sql+"] with parameters: ["+params+"]")
-  }
-
-  // upsert
-  def onDuplicateKeyUpdate (assignments: AssignmentS*) = Upsert(this, assignments.map(_.sql).filter(_.nonEmpty).toList, assignments.foldLeft(List[SqlParam[_]]()){(a,b) => a ++ b.params})
-}
-
-case class Insert (
-  into: String,
-  assignments: List[String] = Nil,
-  params: List[SqlParam[_]] = Nil,
-  comment: Option[String] = None
-) extends InsertBase {
-  def comment (c: String): Insert = copy(comment = Some(c))
-  def sql: String = "INSERT INTO " + into + " SET " + assignments.mkString(", ")
-}
-
-// standard syntax
-case class Insert2 (
-  into: String,
-  assignments: List[SqlAssignment[_]],
-  comment: Option[String] = None
-) extends InsertBase {
-  def comment (c: String): Insert2 = copy(comment = Some(c))
-  def params: List[SqlParam[_]] = assignments.foldLeft(List[SqlParam[_]]()){(a,b) => a ++ b.params}
-  def sql: String = "INSERT INTO " + into + " (" + assignments.map(_.col.columnName).mkString(", ") + ") VALUES (" + assignments.map(_.valueSql).mkString(", ") + ")"
-}
-
-case class InsertBatch (
-  into: String,
-  values: List[List[String]],
-  comment: Option[String] = None
-)
-
-case class Upsert (
-  insert: InsertBase,
-  assignments: List[String] = Nil,
-  updateParams: List[SqlParam[_]]  = Nil
-) extends InsertBase {
-  def sql = insert.sql + " ON DUPLICATE KEY UPDATE " + assignments.mkString(", ")
-  def params = insert.params ++ updateParams
-}
-
-// using a subselect
-case class Insert3 (
-  into: String,
-  columns: List[SqlCol[_]],
-  query: SqlS,
-  comment: Option[String] = None
-) extends InsertBase {
-  def comment (c: String): Insert3 = copy(comment = Some(c))
-  def params: List[SqlParam[_]] = query.params 
-  def sql: String = "INSERT INTO " + into + " (" + columns.map(_.columnName).mkString(", ") + ")\n" + query.sql
-}
-
-case class Update (
-  table: String,
-  assignments: List[String] = Nil,
-  predicate: Option[String] = None,
-  params: List[SqlParam[_]]  = Nil,
-  comment: Option[String] = None
-) {
-  def where (pred: PredicateS) = copy(predicate = predicate.map(_ + " AND " + pred.sql).orElse(Some(pred.sql)), params = this.params ++ pred.params)
-  def sql: String = comment.map("/* " + _ + "*/\n").getOrElse("") + "UPDATE " + table + " SET " + assignments.mkString(", ") + predicate.map(w => " \nWHERE " + w + "\n").getOrElse("")
-
-  def apply ()(implicit c: Connection) = try util.using(c.prepareStatement(sql)) {stmt => 
-    for ((p, idx) <- params.zipWithIndex) p(stmt, idx+1)
-    stmt.executeUpdate()
-  } catch {
-    case e: java.sql.SQLException => throw new Exception("SQL Exception ["+e.getMessage+"] when executing query ["+sql+"] with parameters: ["+params+"]")
-  }
-
-  def comment (c: String): Update = copy(comment = Some(c))
-}
-
-case class Delete (
-  table: String,
-  predicate: String,
-  params: List[SqlParam[_]] = Nil,
-  comment: Option[String] = None
-) {
-  def where (pred: PredicateS) = copy(predicate = predicate + " AND " + pred.sql, params = this.params ++ pred.params)
-  def sql: String = comment.map("/* " + _ + "*/\n").getOrElse("") + "DELETE FROM " + table + "\nWHERE " + predicate + "\n"
-  def apply ()(implicit c: Connection) = {
-    util.using(c.prepareStatement(sql)) {stmt => 
-      for ((p, idx) <- params.zipWithIndex) p(stmt, idx+1)
-      stmt.executeUpdate()
-    }
-  }
-}
-
-case class Query (
-  from:         Option[SqlS],
-  sel:          List[SqlS]    = List("*"),
-  joins:        List[SqlS]    = Nil,
-  predicate:    Option[SqlS]  = None,
-  order:        Option[SqlS]  = None,
-  group:        List[SqlS]    = Nil,
-  limit:        Option[Int]           = None,
-  offset:       Option[Int]           = None,
-  comment:      Option[String]        = None,
-  distinct:     Boolean               = false,
-  forUpdateLock: Boolean              = false
-) {
-
-  // single expr, useful to have it typed for subqueries
-  def select [I](expr: SqlNamedExpr[I,I]): ast.SqlQueryExpr[I] = ast.SqlQueryExpr[I](select(expr: SelectExprS), expr)(expr.sqlTpe)
-
-  def select (cols: SelectExprS*): Query = copy(sel = cols.toList)
-  def forUpdate ()            = copy(forUpdateLock = true)
-  def selectDistinct (cols: SelectExprS*) = copy(sel = cols.map(_.sql).toList, distinct=true)
-  def addCols (cols: ExprS*)  = copy(sel = sel ++ cols.toList)
-  def innerJoin (join: JoinS) = copy(joins = joins ++ List("INNER JOIN " +~ join))
-  def leftJoin (join: JoinS)  = copy(joins = joins ++ List("LEFT JOIN " +~ join))
-
-  // always append? we'll go with that for now
-  def where (pred: PredicateS) = copy(predicate = predicate.map(_ +~ " AND " +~ pred).orElse(Some(pred)))
-
-  def orderBy (order: OrderByS*) = copy(
-    order = Some( 
-      order.toList.map(_.sql).mkString(", ") %? (order.foldLeft(List[SqlParam[_]]())((a,b) => a ++ b.params):_*)
-    )
-  )
-  def groupBy (cols: ExprS*) = copy(
-    group = cols.map(x => x:SqlFragmentS).toList
-  )
-  def limit (l: Int): Query = copy(limit = Some(l))
-  def offset (o: Int): Query = copy(offset = Some(o))
-  def comment (c: String): Query = copy(comment = Some(c))
-  
-  def as (alias: String) = new ast.SqlNamedQuery(this, alias) 
-
-  private def optSql(prefix: String, x: Option[SqlS]) = 
-    x map (prefix +~ _ +~ "\n") getOrElse ("" +~ "")
-
-  private def listSql (prefix: String, x: List[SqlS], delimiter: String = "") = 
-    ifStr(x.nonEmpty)(prefix) +~ x.reduceLeftOption(_ +~ delimiter +~ " \n" +~ _ ).getOrElse("" +~ "") +~ " \n"
-
-  // Monoid append would be nice
-  private def ifStr (cond: Boolean)(subj: String) = (if (cond) subj else "")
-
-  private lazy val selectSql = listSql("SELECT " + ifStr(distinct)("DISTINCT "), sel, ",")
-
-  private lazy val fromSql = optSql("FROM ", from)
-
-  private lazy val joinsSql = listSql("", joins)
-
-  private lazy val whereSql = optSql("WHERE ", predicate)
-
-  private lazy val groupBySql = listSql("GROUP BY ", group, ", ")
-
-  private lazy val orderBySql = optSql("ORDER BY ", order)
-
-  private lazy val limitSql = optSql("LIMIT ", limit map (_.toString))
-
-  private lazy val offsetSql = optSql("OFFSET ", offset map (_.toString))
-
-  lazy val statement = 
-    comment.map(c => "/* " + c + "*/ \n").getOrElse("") +~
-    selectSql +~ 
-    fromSql +~
-    joinsSql +~
-    whereSql +~
-    groupBySql +~
-    orderBySql +~
-    limitSql +~
-    offsetSql +~
-    (ifStr(forUpdateLock)("FOR UPDATE \n"))
-  
-  lazy val sql: String = {
-    statement.sql
-  }
-
-  lazy val params: List[SqlParam[_]] = statement.params
-
-  def process [B](rowParser: ResultSet => ParseResult[B])(implicit c: Connection): QueryResult[B] = new QueryResult(executeQuery(new QueryS(sql, params))(rowParser))
-
-  def find [B](selection: Selection[B])(implicit c: Connection): QueryResult[B] = select(selection.expressions:_*) process selection
-  def findDistinct [B](selection: Selection[B])(implicit c: Connection): QueryResult[B] = selectDistinct(selection.expressions:_*) process selection
-
-  override def toString = {
-    "Query(sql="+sql+", params=" + renderParams(params) +")"
-  }
-
-  def union (q: QueryS) = (sql + "\n UNION \n" + q.sql) onParams (params ++ q.params :_*)  
-}
-
-case class OrderBy (order: String, dir: String = null) {
-  def sql = order + Option(dir).map(" "+_).getOrElse("")
+  def on (pred: SqlExpr[Boolean]) = new builder.JoinBuilder(t.sql, pred)
 }
 

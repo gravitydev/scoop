@@ -27,9 +27,9 @@ trait SqlExpr [X] extends Sql {self =>
   def >=  (v: SqlExpr[X]) = SqlInfixExpr[Boolean](this, v, ">=")
   
   // it would be nice to have a view bound here
-  def in (v: Set[X]) = if (v.isEmpty) query.sql[Boolean]("false") else SqlInfixExpr[Boolean](this, SqlLiteralSetExpr(v), "IN")
+  def in (v: Set[X]) = if (v.isEmpty) SqlLiteralExpr(false) else SqlInfixExpr[Boolean](this, SqlLiteralSetExpr(v), "IN")
   
-  def notIn (v: Set[X]) = if (v.isEmpty) query.sql[Boolean]("true") else SqlInfixExpr[Boolean](this, SqlLiteralSetExpr(v), "NOT IN")
+  def notIn (v: Set[X]) = if (v.isEmpty) SqlLiteralExpr(true) else SqlInfixExpr[Boolean](this, SqlLiteralSetExpr(v), "NOT IN")
  
   // should I get rid of these in favor of the symbolic ones?
   def and (v: SqlExpr[Boolean])(implicit ev: SqlExpr[X] =:= SqlExpr[Boolean]) = SqlInfixExpr[Boolean](ev(this), v, "AND")
@@ -51,8 +51,8 @@ trait SqlExpr [X] extends Sql {self =>
   def * [T,N](v: SqlExpr[T])(implicit ev1: SqlExpr[X]=>SqlExpr[N], ev2: SqlExpr[T]=>SqlExpr[N], ev3: SqlType[N]) = SqlInfixExpr[N](this, v, "*")
   def / [T,N](v: SqlExpr[T])(implicit ev1: SqlExpr[X]=>SqlExpr[N], ev2: SqlExpr[T]=>SqlExpr[N], ev3: SqlType[N]) = SqlInfixExpr[N](this, v, "/")
  
-  def desc  = SqlOrdering(this, Descending)
-  def asc   = SqlOrdering(this, Ascending)
+  def desc  = new builder.SqlOrdering(this, builder.SqlOrder.Descending)
+  def asc   = new builder.SqlOrdering(this, builder.SqlOrder.Ascending)
 
   type TypeMapper[A,B] = SqlType[A] => SqlType[B]
   type ExprMapper[A,B,C] = SqlExpr[A] => SqlExpr[B] => SqlExpr[C]
@@ -81,18 +81,10 @@ class SqlWrappedExpr [T,X:SqlType] (sqlExpr: SqlExpr[T]) extends SqlBaseExpr[X] 
   def sql = sqlExpr.sql
 }
 
-abstract class SqlOrder (val sql: String)
-case object Ascending   extends SqlOrder ("ASC")
-case object Descending  extends SqlOrder ("DESC")
-case class SqlOrdering (expr: ast.SqlExpr[_], order: SqlOrder) {
-  def sql = expr.sql + " " + order.sql
-  def params = expr.params
-}
-
 /**
  * Typed query with one column
  */
-case class SqlQueryExpr[I:SqlType] (query: com.gravitydev.scoop.query.Query, expr: SqlParseExpr[I]) extends SqlExpr[I] {
+case class SqlQueryExpr[I:SqlType] (query: com.gravitydev.scoop.builder.Query, expr: SqlParseExpr[I]) extends SqlExpr[I] {
   val sqlTpe = SqlType[I]
   override def sql = "(" + util.formatSubExpr(query.sql) + ")"
   def params = query.params
@@ -181,7 +173,7 @@ class SqlNonNullableCol[T:SqlType](val columnName: String, cast: Option[String],
   def parse (rs: ResultSet): Option[T] = SqlType[T].parse(rs, name)
 
   def nullable = new SqlNullableCol[T](columnName, cast, table, explicitAlias)
-  def := (x: SqlExpr[T]) = new SqlAssignment(this, x)
+  def := (x: SqlExpr[T]) = new ast.SqlAssignment(this, x)
 }
 
 class SqlNullableCol[T:SqlType](val columnName: String, cast: Option[String], table: SqlTable[_], explicitAlias: String) 

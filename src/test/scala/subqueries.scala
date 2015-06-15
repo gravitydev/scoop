@@ -13,6 +13,8 @@ class SubqueriesSpec extends FlatSpec with ShouldMatchers {
 
   "Subquery" should "work in the SELECT clause" in {
     using (tables.users) {u =>
+      update(u).set(u.age := 30)()
+
       val sub = from(u).select(u.age as "age")
     
       sub as "a"
@@ -106,7 +108,9 @@ class SubqueriesSpec extends FlatSpec with ShouldMatchers {
 
   "A string based subquery" should "work on the SELECT clause" in {
     using (tables.users) {u =>
-      from(u).find( sql[Boolean]("(SELECT ?)" %? 1) as "someBool" ).list should be (List(true))
+      from(u)
+        .find( sqlExpr[Boolean]("(SELECT ?)" %? 1) as "someBool" )
+        .list should be (List(true))
     }
   }
 
