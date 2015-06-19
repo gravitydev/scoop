@@ -24,87 +24,87 @@ trait BaseSqlDialect extends SqlDialect {
 
   def optSeq (prefix: Doc, n: Seq[Doc]) = if (n.isEmpty) empty else prefix <+> csv(n) <> line
  
-  def sql (n: ast.QueryNode): Doc = n match {
-    case q: ast.Query[_] => 
-      opt(q.comment.map(_ <> line)) <>
-      // select
-      "SELECT" <+> csv(q.sel.expressions map aliasedSql) <>
-      // from
-      opt( q.from.map(queryable => line <> "FROM" <+> aliasedSql(queryable) ) ) <> 
-      // joins
-      (if (q.joins.nonEmpty) line else empty) <> vsep( q.joins.toList.map(sql(_)) ) <> 
-      // where
-      opt( q.predicate.map(w => line <> "WHERE" <+> nest(sql(w)) ) ) <>
-      // group by
-      optSeq(
-        line <> "GROUP BY",
-         q.group.toList.map(sql)
-      ) <>
-      // order by
-      optSeq(
-        line <> "ORDER BY",
-        q.order.toList.map(sql)
-      ) <>
-      // limit
-      opt( q.limit.map(l => line <> "LIMIT" <+> l.toString) ) <>
-      // offset
-      opt( q.offset.map(o => line <> "OFFSET" <+> o.toString) ) <>
-      // update lock
-      opt( Option(line <> "FOR UPDATE").filter(_ => q.forUpdateLock) )
+  def sql (n: ast.QueryNode): Doc = {
+    // if there's a comment
+    (if (n._comment != "") "/*" <> n._comment.replace("/*","[*").replace("*/", "*]") <> "*/" <> line else empty) <>
+    (n match {
+      case q: ast.Query[_] => 
+        // select
+        "SELECT" <+> csv(q.sel.expressions map aliasedSql) <>
+        // from
+        opt( q.from.map(queryable => line <> "FROM" <+> aliasedSql(queryable) ) ) <> 
+        // joins
+        (if (q.joins.nonEmpty) line else empty) <> vsep( q.joins.toList.map(sql(_)) ) <> 
+        // where
+        opt( q.predicate.map(w => line <> "WHERE" <+> nest(sql(w)) ) ) <>
+        // group by
+        optSeq(
+          line <> "GROUP BY",
+           q.group.toList.map(sql)
+        ) <>
+        // order by
+        optSeq(
+          line <> "ORDER BY",
+          q.order.toList.map(sql)
+        ) <>
+        // limit
+        opt( q.limit.map(l => line <> "LIMIT" <+> l.toString) ) <>
+        // offset
+        opt( q.offset.map(o => line <> "OFFSET" <+> o.toString) ) <>
+        // update lock
+        opt( Option(line <> "FOR UPDATE").filter(_ => q.forUpdateLock) )
 
-    case c: ast.SqlCol[_] => c.table._alias <> "." <> c.columnName
+      case c: ast.SqlCol[_] => c.table._alias <> "." <> c.columnName
 
-    case ast.SqlNamedStrictExpr(expr,_) => sql(expr)
+      case ast.SqlNamedStrictExpr(expr,_) => sql(expr)
 
-    case ast.SqlInfixExpr(l,r,op) => sql(l) <+> op <+> sql(r)
+      case ast.SqlInfixExpr(l,r,op) => sql(l) <+> op <+> sql(r)
 
-    case ast.SqlBinaryApplic(values, op) =>
-      ssep( 
-        values.toList.map {
-          case x @ ast.SqlBinaryApplic(_,_) => parens( nest(line <> sql(x)) <> line )
-          case x => sql(x)
-        }, 
-        " " <> op <> line 
-      )
-  
-    case ast.SqlLiteralExpr(_) => "?"
+      case ast.SqlBinaryApplic(values, op) =>
+        ssep( 
+          values.toList.map {
+            case x @ ast.SqlBinaryApplic(_,_) => parens( nest(line <> sql(x)) <> line )
+            case x => sql(x)
+          }, 
+          " " <> op <> line 
+        )
+    
+      case ast.SqlLiteralExpr(_) => "?"
 
-    case ast.SqlAssignment(col, value) => col.columnName <+> "=" <+> (sql(value) <> string(col.cast.map("::" + _).getOrElse(""))) // postgres hack
+      case ast.SqlAssignment(col, value) => col.columnName <+> "=" <+> (sql(value) <> string(col.cast.map("::" + _).getOrElse(""))) // postgres hack
 
-    case ast.Join(queryable, onPred, joinType) => joinType.sql <+> "JOIN" <+> aliasedSql(queryable) <+> "ON" <+> sql(onPred)
+      case ast.Join(queryable, onPred, joinType) => joinType.sql <+> "JOIN" <+> aliasedSql(queryable) <+> "ON" <+> sql(onPred)
 
-    case ast.Delete(table, pred, comment) => 
-      comment.map("/*" <+> _ <+> "*/").getOrElse(empty) <> line <> 
-      "DELETE FROM" <+> table._tableName <> line <>
-      "WHERE" <+> sql(pred)
+      case ast.Delete(table, pred) => 
+        "DELETE FROM" <+> table._tableName <> line <>
+        "WHERE" <+> sql(pred)
 
-    case ast.Insert(table, assignments, comment) => 
-      comment.map("/*" <+> _ <+> "*/").getOrElse(empty) <> line <> 
-      "INSERT INTO" <+> table <+> 
-      parens( ssep( assignments.toList.map(_.col.columnName).map(string), comma <> " ") ) <+>
-      "VALUES" <+>
-      parens( ssep( assignments.toList.map(_ => string("?")), comma <> " ") )
+      case ast.Insert(table, assignments) => 
+        "INSERT INTO" <+> table <+> 
+        parens( ssep( assignments.toList.map(_.col.columnName).map(string), comma <> " ") ) <+>
+        "VALUES" <+>
+        parens( ssep( assignments.toList.map(_ => string("?")), comma <> " ") )
 
-    case ast.Update (table, assignments, predicate, comment) =>
-      comment.map("/*" <+> _ <+> "*/").getOrElse(empty) <> line <> 
-      "UPDATE" <+> table._tableName <+> "SET" <+> 
-      ssep( 
-        assignments.toList.map(sql),
-        comma <> " "
-      ) <> line <>
-      opt( predicate.map(w => "WHERE" <+> sql(w) <> line) )
+      case ast.Update (table, assignments, predicate) =>
+        "UPDATE" <+> table._tableName <+> "SET" <+> 
+        ssep( 
+          assignments.toList.map(sql),
+          comma <> " "
+        ) <> line <>
+        opt( predicate.map(w => "WHERE" <+> sql(w) <> line) )
 
-    case ast.SqlUnaryExpr(l, op, postfix) => if (postfix) sql(l) <+> op else op <+> sql(l)
+      case ast.SqlUnaryExpr(l, op, postfix) => if (postfix) sql(l) <+> op else op <+> sql(l)
 
-    case ast.SqlRawExpr(expr) => string(expr.sql)
+      case ast.SqlRawExpr(expr) => string(expr.sql)
 
-    case ast.Upsert(insert, assignments) => sql(insert) <> line <> "ON DUPLICATE KEY UPDATE" <+> ssep( assignments.toList.map(sql), comma <> " ")
+      case ast.Upsert(insert, assignments) => sql(insert) <> line <> "ON DUPLICATE KEY UPDATE" <+> ssep( assignments.toList.map(sql), comma <> " ")
 
-    case ast.SqlOrdering(expr, dir) => sql(expr) <+> dir.sql
+      case ast.SqlOrdering(expr, dir) => sql(expr) <+> dir.sql
 
-    case ast.SqlQueryExpr(query) => parens( nest(line <> sql(query)) <> line )
+      case ast.SqlQueryExpr(query) => parens( nest(line <> sql(query)) <> line )
 
-    case ast.SqlWrappedExpr(expr) => sql(expr)
+      case ast.SqlWrappedExpr(expr) => sql(expr)
+    })
   }
 
   def params (q: ast.QueryNode): Seq[SqlParam[_]] = q match {
@@ -129,9 +129,9 @@ trait BaseSqlDialect extends SqlDialect {
     case col: ast.SqlCol[_] => Nil
     case ast.SqlAssignment(_, value) => params(value) 
     case ast.Join(queryable, onPred, _) => params(queryable) ++ params(onPred)
-    case ast.Delete(table, pred, _) => params(pred)
-    case ast.Insert(_, assignments, _) => assignments.flatMap(params)
-    case ast.Update (_, assignments, predicate, _) => assignments.flatMap(params) ++ predicate.toList.flatMap(params)
+    case ast.Delete(table, pred) => params(pred)
+    case ast.Insert(_, assignments) => assignments.flatMap(params)
+    case ast.Update (_, assignments, predicate) => assignments.flatMap(params) ++ predicate.toList.flatMap(params)
     case ast.SqlUnaryExpr(l,_,_) => params(l) 
     case ast.SqlRawExpr(expr) => expr.params
     case ast.Upsert(insert, assignments) => params(insert) ++ assignments.toList.flatMap(params)
@@ -150,6 +150,8 @@ trait BaseSqlDialect extends SqlDialect {
 }
 
 object BaseSqlDialect extends BaseSqlDialect
+
+object MySqlDialect extends BaseSqlDialect
 
 object PostgresDialect extends BaseSqlDialect {
   override def sql (q: ast.QueryNode): Doc = q match {

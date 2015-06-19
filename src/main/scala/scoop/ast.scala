@@ -11,7 +11,11 @@ object `package` {
   type TableT = ast.SqlTable[T] forSome {type T <: ast.SqlTable[T]}
 }
 
-sealed trait QueryNode
+sealed trait QueryNode {
+  /** A comment that will be included in the generated sql - useful for debugging */
+  var _comment: String = ""
+  def comment(s: String) = {_comment = s; this}
+}
 
 sealed trait Queryable extends QueryNode
 
@@ -61,17 +65,13 @@ sealed trait InsertBase extends QueryNode {
 
 case class Insert (
   into: String,
-  assignments: Seq[ast.SqlAssignment[_]] = Nil,
-  comment: Option[String] = None
-) extends InsertBase {
-  def comment (c: String): Insert = copy(comment = Some(c))
-}
+  assignments: Seq[ast.SqlAssignment[_]] = Nil
+) extends InsertBase
 
 // TODO
 case class InsertBatch (
   into: String,
-  values: List[List[String]],
-  comment: Option[String] = None
+  values: List[List[String]]
 )
 
 case class Upsert (
@@ -85,15 +85,12 @@ case class InsertWithQuery (
   columns: List[ast.SqlCol[_]],
   query: ast.Query[_],
   comment: Option[String] = None
-) extends InsertBase {
-  def comment (c: String): InsertWithQuery = copy(comment = Some(c))
-}
+) extends InsertBase
 
 case class Update (
   table: TableT,
   assignments: Seq[ast.SqlAssignment[_]] = Nil,
-  predicate: Option[ast.SqlExpr[Boolean]] = None,
-  comment: Option[String] = None
+  predicate: Option[ast.SqlExpr[Boolean]] = None
 ) extends QueryNode {
   def where (pred: ast.SqlExpr[Boolean]): Update = copy(predicate = predicate.map(_ && pred).orElse(Some(pred)))
 
@@ -107,14 +104,11 @@ case class Update (
       case e: java.sql.SQLException => throw new Exception("SQL Exception ["+e.getMessage+"] when executing query ["+parameterizedSql.sql+"] with parameters: ["+parameterizedSql.params+"]")
     }
   }
-
-  def comment (c: String): Update = copy(comment = Some(c))
 }
  
 case class Delete (
   table: TableT,
-  predicate: ast.SqlExpr[Boolean],
-  comment: Option[String] = None
+  predicate: ast.SqlExpr[Boolean]
 ) extends QueryNode {
   def where (pred: ast.SqlExpr[Boolean]) = copy(predicate = predicate && pred)
 
@@ -324,7 +318,6 @@ case class Query [T](
   group:        Seq[ast.SqlExpr[_]]   = Nil,
   limit:        Option[Int]           = None,
   offset:       Option[Int]           = None,
-  comment:      Option[String]        = None,
   selectDistinct: Boolean             = false,
   forUpdateLock: Boolean              = false
 ) extends QueryNode {

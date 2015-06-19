@@ -84,6 +84,6 @@ case class QueryBuilder(
   def offset (o: Int): QueryBuilder = copy(offset = Some(o))
   def comment (c: String) = copy(comment = Some(c))
   
-  protected def buildQuery[X](sel: Selection[X]): ast.Query[X] = ast.Query(sel, from, joins, predicate, order, group, limit, offset, comment, distinct, forUpdateLock)
+  protected def buildQuery[X](sel: Selection[X]): ast.Query[X] = ast.Query(sel, from, joins, predicate, order, group, limit, offset, distinct, forUpdateLock)
 }
 
