@@ -10,11 +10,9 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
 
   Class forName "com.mysql.jdbc.Driver"
   implicit lazy val con = java.sql.DriverManager.getConnection("jdbc:mysql://localhost/scoop_test", "root", "")
- 
+
   "Basic number operators" should "work" in {
     val num: ast.SqlExpr[Int] = 1 
-
-    (num + 2 as "x").selectSql
 
     (num + 2 as "a") should matchSelectSql("(? + ?) as a", 1, 2)
     (num - 2 as "a") should matchSelectSql("(? - ?) as a", 1, 2)
@@ -51,7 +49,7 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
   
   "Implicits" should "work" in {
     using (tables.issues as "i") {i =>
-      (i.id := i.id + 1) should matchSql("id = (i.id + ?)", 1)
+      (i.id := i.id + 1) should matchSql("id = i.id + ?", 1)
     }
   }
  
@@ -95,11 +93,11 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
         .select( functions.count( u.id ) as "x" )
 
       from(u)
-        .find( Parsers.total( functions.count(u.id) ) as "x" )
+        .find( functions.count(u.id) as "x" )
         .list
     }
   }
-  
+
   "Functions" should "output correct sql" in {
     import functions._
 
@@ -108,12 +106,12 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
     select(
       count(1).as("total"), 
       4 as "num"
-    ).rawQuery should matchSql("SELECT COUNT(?) as total, ? as num", 1, 4)
+    ) should matchSql("SELECT COUNT(?) as total, ? as num", 1, 4)
 
     select(
       coalesce(countDistinct(1), 0L) as "total", 
       4 as "num"
-    ).rawQuery should matchSql("SELECT COALESCE(COUNT(DISTINCT ?), ?) as total, ? as num", 1, 0, 4)
+    ) should matchSql("SELECT COALESCE(COUNT(DISTINCT ?), ?) as total, ? as num", 1, 0, 4)
 
     using (tables.users as "u") {u =>
       (coalesce(u.id, 0L) as "v") should matchSelectSql("COALESCE(u.id, ?) as v", 0L)
@@ -160,17 +158,6 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
     }
   }
 
-  /*
-  it should "work with string-based queries" in {
-    using (tables.users) {u =>
-      from(u)
-        .orderBy("FIELD (" +~ u.first_name +~ ", ?, ?, ?, ?" %? ("A", "B", "C", "D"))
-        .find(u.id)
-        .list
-    }
-  }
-  */
-
   "Fragments" should "work anywhere on a query" in {
     using (tables.users) {u =>
       val ids: List[Long] = from(u as "u")
@@ -191,7 +178,7 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
         .where(u.id === -1)
 
       q should matchSql(
-        "UPDATE users SET first_name = ?, last_name = ? WHERE (users.id = ?)", 
+        "UPDATE users SET first_name = ?, last_name = ? WHERE users.id = ?", 
         "check", 
         "Some other value", 
         -1
@@ -218,7 +205,7 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
   }
 
   "Parameterized sql on select" should "work" in {
-    select(sqlExpr[Int]("?" %? 1))
+    select(sqlExpr[Int]("?" %? 1) as "a")
   }
 
   "Group By clause" should "work" in {
@@ -235,7 +222,7 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
       val q = update(u)
         .set(u.age := u.age + 1)
 
-      q should matchSql("UPDATE users SET age = (users.age + ?)", 1)
+      q should matchSql("UPDATE users SET age = users.age + ?", 1)
     }
   }
 
@@ -266,6 +253,7 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
     }
   }
 
+
   "Random stuff" should "work" in {
     val s = select(sqlExpr[String]("'hello'").as("a"))
     val xx = sqlExpr[scala.math.BigDecimal]("SOMETHING").as("SOMETHING2").expressions
@@ -278,14 +266,15 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
     val folded = mapped.foldLeft(false : ast.SqlExpr[Boolean])(_ or _)
 
     {
-      val x = "(" +~ from(u).where(u.id |=| 24) +~ ") UNION (" +~ from(i).where(i.id === 13) +~ ")"
+      val x = 
+        "(" +~ from(u).where(u.id |=| 24).select(u.id) +~ ") UNION (" +~ from(i).where(i.id === 13).select(u.id) +~ ")"
     }
 
     {
       val q = 
         from(u)
           .where(
-            sqlExpr[Boolean]("u.id IN (" +~ from(u).where(u.id === 2) +~ ")")
+            sqlExpr[Boolean]("u.id IN (" +~ from(u).where(u.id === 2).select(u.id) +~ ")")
           )
     }     
 
@@ -296,8 +285,8 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
     val xparser = i.id ~ userP ~ sqlExpr[Long]("(SELECT 1)").as("test")
 
     val testParser = i.id ~ xparser
-    val qq = from(i) select(testParser.expressions:_*) 
-    val qx = from(i).where(i.id |=| subquery[Long](qq))
+    val qq = from(i) select(i.id) 
+    val qx = from(i).where(i.id |=| qq)
 
     val num = "SELECT 1 as num FROM users WHERE 1 = ?" %? 1 process sqlInt("num") head;
 
@@ -377,8 +366,31 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
       .where(i.item_id === 24)
 
     val vx = from(i)
-      .select( (sqlExpr[Int]("1").as("test") >> {x => x}).expressions:_* )
+      .select( 
+        (sqlExpr[Int]("1").as("test") >> {x => x})
+      )
     
+  }
+
+  "A somewhat complex query" should "work" in {
+    val query = using (tables.users, tables.users, tables.issues) {(u,u2,i) => 
+      from(u)      
+        .innerJoin(u2 on u2.age === u.id)
+        .leftJoin(i on i.assigned_to === u.id)
+        .where(
+          u.age < 24 && 
+          (u.id === 27 || u.id === 23 || u.id === 7) &&
+          (u.id |=| from(u).select(29L as "num"))
+        )
+        .limit(100)
+        .offset(10)
+        .orderBy(i.id, i.assigned_to.desc, 24.desc)
+        .select(u.id, u.first_name, u.last_name, u2.age)
+    }
+    println(query)
+    val statement: ParameterizedSql = query
+    println(statement.sql)
+    println(statement.params)
   }
 
 }

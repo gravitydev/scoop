@@ -15,8 +15,6 @@ object Parsers {
     u.id ~
     (u.first_name ~ u.last_name >> (_ + " " + _)) ~
     u.role >> User.apply
-
-  def total (count: SqlExpr[Long]) = count //>> (x => x)
  
   //val rep = user(users)
   

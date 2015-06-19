@@ -1,8 +1,8 @@
 package com.gravitydev.scoop
 package ast
 
-import builder.{Query, Join, SelectExpr}
-import query.stringToFragment
+import builder.SelectExpr
+import query.{stringToFragment, ParameterizedSql}
 import java.sql.ResultSet
 
 /** 
@@ -11,23 +11,20 @@ import java.sql.ResultSet
  */
 trait SqlNamed {
   def name: String
-  def sql: String
-  def params: Seq[SqlParam[_]] 
+  //def sql: ParameterizedSql
 }
 
 /** Typed parseable sql expression */
-trait SqlNamedExpr [I,+O] extends SqlExpr[I] with SqlNamed with parsers.ExprSelection [O] {self =>
+trait SqlNamedExpr [I,+O] extends SqlExpr[I] with SqlNamed with parsers.ExprSelection[O] {self =>
   def parse (rs: ResultSet): Option[O]
 
   def apply (rs: ResultSet): ParseResult[O] = parse(rs).toRight("Column ["+name+"] not found in ResultSet: "+util.inspectRS(rs))
 
   def name: String
-  def sql: String
-  def params: Seq[SqlParam[_]]
 
-  def selectSql = sql + " as " + name
+  //def selectSql = sql.sql + " as " + name
 
-  def expressions = List(new SelectExpr(selectSql, params))
+  def expressions = List(this) //List(new SelectExpr(ParameterizedSql(selectSql, params)))
 
   // this should only be applicable to sub-queries
   def apply [X:SqlType](column: String) = new SqlRawExpr[X](name+"."+column)
@@ -35,55 +32,24 @@ trait SqlNamedExpr [I,+O] extends SqlExpr[I] with SqlNamed with parsers.ExprSele
   def apply [X](col: ast.SqlNamedStrictExpr[X]): ast.SqlNamedStrictExpr[X] = new ast.SqlRawExpr[X](name+"."+col.name)(col.sqlTpe).as(col.name)
 }
 
-trait SqlNamedStrictExpr [T] extends SqlNamedExpr[T,T]
-trait SqlNamedOptExpr [T] extends SqlNamedExpr[T,Option[T]] 
-
-private [scoop] class SqlNamedExprImpl [T:SqlType] (val name: String, exprSql: String, val params: Seq[SqlParam[_]]) 
-    extends SqlExpr[T] with SqlNamedStrictExpr[T] with Selection[T] {self =>
+private [scoop] case class SqlNamedStrictExpr [T:SqlType] (expr: SqlExpr[T], name: String) 
+    extends SqlNamedExpr[T,T] with Selection[T] {self =>
   val sqlTpe = SqlType[T]
 
-  def sql = exprSql
-
-  def as (alias: String): SqlNamedExpr[T,T] = new SqlNamedExprImpl [T] (alias, sql, params)
+  def as (alias: String): SqlNamedExpr[T,T] = SqlNamedStrictExpr[T](expr, alias)
 
   def parse (rs: ResultSet): Option[T] = SqlType[T].parse(rs, name)
+
+  override def toString = "SqlNamedStrictExpr(" + expr + " as " + name + ")"
 }
 
-private [scoop] class SqlOptNamedExprImpl[T:SqlType] (val name: String, exprSql: String, val params: Seq[SqlParam[_]])
-    extends SqlExpr[T] with SqlNamedOptExpr[T] with Selection[Option[T]] {self =>
+private [scoop] case class SqlNamedOptExpr[T:SqlType] (expr: SqlExpr[T], name: String)
+    extends SqlNamedExpr[T,Option[T]] with Selection[Option[T]] {self =>
 
   val sqlTpe = SqlType[T]
 
-  def sql = exprSql
-
-  def as (alias: String): SqlNamedExpr[T,Option[T]] = new SqlOptNamedExprImpl [T] (alias, sql, params)
+  def as (alias: String): SqlNamedExpr[T,Option[T]] = SqlNamedOptExpr[T](expr, alias)
 
   def parse (rs: ResultSet) = Some(SqlType[T].parse(rs, name))
-}
-
-/** Named query expression (returns one column) */
-private [scoop] class SqlNamedQueryExpr[I:SqlType] (queryExpr: SqlQueryExpr[I], val name: String) extends SqlNamedExpr[I,I] {
- 
-  val sqlTpe = SqlType[I] 
-
-  def sql = "(" + queryExpr.sql + ")"
-  def params = queryExpr.params
-
-  def parse (rs: ResultSet) = SqlType[I].parse(rs, name)
-  
-  def on (pred: SqlExpr[Boolean]) = new builder.JoinBuilder(selectSql %? (params:_*), pred)
-}
-
-/** Named query (untyped) */
-private [scoop] class SqlNamedQuery (val query: Query, val name: String) extends SqlNamed {
-  val sql = "(" + query.rawQuery.sql + ") as " + name
-  val params = query.rawQuery.params
-
-  // generate a column alias
-  def apply [X:SqlType](column: String) = new SqlRawExpr[X](name+"."+column)
-  def apply [X](col: ast.SqlNamedOptExpr[X]): ast.SqlNamedOptExpr[X] = new ast.SqlRawOptExpr[X](name+"."+col.name)(col.sqlTpe).as(col.name)
-  def apply [X](col: ast.SqlNamedStrictExpr[X]): ast.SqlNamedStrictExpr[X] = new ast.SqlRawExpr[X](name+"."+col.name)(col.sqlTpe).as(col.name)
-
-  def on (pred: SqlExpr[Boolean]) = new builder.JoinBuilder(sql, pred)
 }
 

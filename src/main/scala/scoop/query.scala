@@ -5,60 +5,52 @@ import java.sql.{Connection, Date, Timestamp, ResultSet}
 import scala.collection.mutable.ListBuffer
 import util.{ResultSetIterator, QueryResult}
 import scala.collection._, 
-  ast.{SqlType, SqlParseExpr, SqlLiteralExpr, SqlCol, SqlRawExpr, SqlNamedExpr, SqlRawParamExpr, SqlWrappedExpr}
-import builder.{DeleteBuilder, Join, Query, InsertBuilder, UpdateBuilder}
+  ast.{Query, Join, SqlType, SqlParseExpr, SqlLiteralExpr, SqlCol, SqlRawExpr, SqlNamedExpr}
+import builder.{DeleteBuilder, QueryBuilder, InsertBuilder, UpdateBuilder}
 
-class ColumnParser (name: String)
-
-object `package` {
+object `package` extends builder.QueryBuilderBase {
   @deprecated("Use SqlExpr[Boolean]", "0.1.23-SNAPSHOT")
   type Predicate = ast.SqlExpr[Boolean]
 
-  // only here for backwards compat
-  @deprecated("Use .find(...).list to explicitly convert QueryResult[T] to List[T]", "0.3.0-SNAPSHOT")
-  implicit def queryResultToList [T](rs: util.QueryResult[T]) = rs.list
-  
-  implicit def stringToFragment (s: String) = new SqlFragmentS(s, Nil)
+  /** Shadow this to use a different dialog */
+  implicit def sqlDialect: SqlDialect = BaseSqlDialect
+
+  implicit def stringToFragment (s: String) = ParameterizedSql(s, Nil)
  
   // kind of hacky 
-  implicit def intToLongExpr (a: SqlExpr[Int]): SqlExpr[Long] = new SqlWrappedExpr[Int,Long](a)(sqlLong)
-
-  implicit def fragmentToQueryS (s: SqlFragmentS) = new RawQuery(s.sql, s.params)
+  implicit def intToLongExpr (a: SqlExpr[Int]): SqlExpr[Long] = new ast.SqlWrappedExpr[Long](a) 
 
   implicit def baseToSqlLit [T](base: T)(implicit sqlType: SqlType[T]): SqlParseExpr[T] = SqlLiteralExpr(base)
-  implicit def tableToWrapped [T <: Table[_]] (t: T) = new TableOps(t)
+  implicit def tableToWrapped [T <: ast.TableT] (t: T) = new TableOps(t)
   implicit def optToSqlLit [T](base: Option[T])(implicit sqlType: SqlType[T]) = base map {x => SqlLiteralExpr(x)}
   implicit def baseToParam [T](base: T)(implicit sqlType: SqlType[T]) = SqlSingleParam(base)
 
-  implicit def queryToQueryS (q: builder.Query) = q.rawQuery
+  implicit def queryToSql (q: builder.Query[_])(implicit dialect: SqlDialect) = dialect.toParameterizedSql(q)
   
   implicit def companionToTable [T <: Table[T]] (companion: {def apply (): T}): T = companion()
-  implicit def sqlToFragment (s: SqlS) = new SqlFragmentS(s.sql, s.params)
 
-  def exists [T:SqlType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "EXISTS", postfix=false)
+  def exists [T:SqlType](query: builder.Query[T]) = ast.SqlUnaryExpr[T,Boolean](new ast.SqlQueryExpr(query), "EXISTS", postfix=false)
   def notExists [T:SqlType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "NOT EXISTS", postfix=false) 
 
   // starting point
-  def from (table: builder.From) = Query(Some(table))
-  def where (pred: ast.SqlExpr[Boolean]) = Query(None, predicate = Some(pred))
-  def select (cols: builder.SelectExpr*): Query = Query(None, sel = cols.toList)
+  def from (table: ast.Queryable) = QueryBuilder(Some(table))
+  def where (pred: ast.SqlExpr[Boolean]) = QueryBuilder(None, predicate = Some(pred))
+  //def select (cols: builder.SelectExpr*): Query = Query(None, sel = cols.toList)
   def insertInto (table: Table[_]) = new InsertBuilder(table._tableName)
-  def update (table: builder.TableT) = new UpdateBuilder(table)
-  def deleteFrom (table: builder.TableT) = new DeleteBuilder(table)
+  def update (table: ast.TableT) = new UpdateBuilder(table)
+  def deleteFrom (table: ast.TableT) = new DeleteBuilder(table)
 
   @deprecated("Use sqlExpr", "1.0") 
-  def sql [T:SqlType] (sql: String): SqlParseExpr[T] = sqlExpr(sql)
+  def sql [T:SqlType] (sql: String): SqlParseExpr[T] = sqlExpr(ParameterizedSql(sql, Nil))
 
   @deprecated("Use sqlExpr", "1.0")
-  def sql [T:SqlType] (sql: SqlS): SqlParseExpr[T] = sqlExpr(sql)
+  def sql [T:SqlType] (sql: ParameterizedSql): SqlParseExpr[T] = sqlExpr(sql)
 
-  def sqlExpr [T:SqlType] (sql: String): SqlParseExpr[T] = new SqlRawExpr[T](sql, Nil)
-  def sqlExpr [T:SqlType] (sql: SqlS): SqlParseExpr[T] = new SqlRawExpr[T](sql.sql, sql.params)
+  //def sqlExpr [T:SqlType] (sql: String): SqlParseExpr[T] = new SqlRawExpr[T](sql, Nil)
+  def sqlExpr [T:SqlType] (sql: ParameterizedSql): SqlParseExpr[T] = new SqlRawExpr[T](sql)
  
+  protected def buildQuery [X](sel: Selection[X]) = Query(sel)
   
-  // necessary anymore?
-  def subquery [T:SqlType] (q: RawQuery): SqlExpr[T] = new SqlRawParamExpr("("+q.sql+")", q.params)
-
   // safe aliasing
   private class Aliaser {
     import scala.collection.mutable.ListBuffer
@@ -77,7 +69,7 @@ object `package` {
     
   private [this] def aliasing [T](fn: Aliaser => T) = fn(new Aliaser)
 
-  def executeQuery [B](query: RawQuery)(rowParser: ResultSet => ParseResult[B])(implicit c: Connection): Iterator[B] = try {
+  def executeQuery [B](query: ParameterizedSql)(rowParser: ResultSet => ParseResult[B])(implicit c: Connection): Iterator[B] = try {
     val statement = c.prepareStatement(query.sql)
     for ((p, idx) <- query.params.zipWithIndex) p(statement, idx+1)
     val rs = statement.executeQuery()
@@ -114,7 +106,7 @@ object `package` {
   def using [R, A <: Table[A], B <: Table[B], C <: Table[C], D <: Table[D], E <: Table[E], F <: Table[F], G <: Table[G], H <: Table[H], I <: Table[I], J <: Table[J], K <: Table[K], L <: Table[L], M <: Table[M], N <: Table[N], O <: Table[O], P <: Table[P], Q <: Table[Q], S <: Table[S]](a: TC[A], b: TC[B], c: TC[C], d: TC[D], e: TC[E], f: TC[F], g: TC[G], h: TC[H], i: TC[I], j: TC[J], k: TC[K], l: TC[L], m: TC[M], n: TC[N], o: TC[O], p: TC[P], q: TC[Q], s: TC[S])(fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,S)=>R) = aliasing(x => fn(x(a), x(b), x(c), x(d), x(e), x(f), x(g), x(h), x(i), x(j), x(k), x(l), x(m), x(n), x(o), x(p), x(q), x(s)))
 }
 
-class TableOps [T <: Table[_]](t: T) {
-  def on (pred: SqlExpr[Boolean]) = new builder.JoinBuilder(t.sql, pred)
+class TableOps [T <: ast.TableT](t: T) {
+  def on (pred: SqlExpr[Boolean]) = new builder.JoinBuilder(t, pred)
 }
 

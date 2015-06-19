@@ -1,7 +1,7 @@
 package com.gravitydev.scoop
 
 import java.sql.{ResultSet, PreparedStatement, Types, Timestamp, Date}
-import ast.{SqlNamedExpr, SqlParseExpr, SqlWrappedExpr, SqlNonNullableCol, SqlNullableCol, SqlUnderlyingType}
+import ast.{SqlNamedExpr, SqlNamedQuery, SqlParseExpr, SqlNonNullableCol, SqlNullableCol, SqlUnderlyingType}
 import parsers.Selection1
 
 object `package` {
@@ -80,10 +80,15 @@ object `package` {
   implicit def nonNullableColToSelection [X] (col: SqlNonNullableCol[X]): Selection1[X] = new Selection1 (col, col.expressions)
   implicit def nullableColToSelection [X] (col: SqlNullableCol[X]): Selection1[Option[X]] = new Selection1 (col, col.expressions)
 
+  /** Turns a named query into an named expression (Selection) */
+  implicit def namedQueryToExpr[T:SqlType](q: SqlNamedQuery[T]): ast.SqlNamedQueryExpr[T] = new ast.SqlNamedQueryExpr(q.query, q.name)
+
+  /** Turns a query into an expression */
+  implicit def queryToExpr[T:SqlType](q: ast.Query[T]): ast.SqlExpr[T] = new ast.SqlQueryExpr(q) 
+
   implicit def exprToParseExpr [T](expr: SqlExpr[T]): SqlParseExpr[T] = new SqlParseExpr [T] {
     val sqlTpe = expr.sqlTpe
-    val sql = expr.sql
-    val params = expr.params
+    //val sql = expr.sql
   }
   
   private[scoop] def renderParams (params: Seq[SqlParam[_]]) = params.map(x => x.v + ":"+x.v.asInstanceOf[AnyRef].getClass.getName.stripPrefix("java.lang."))
@@ -94,7 +99,8 @@ object `package` {
  */
 trait Selection [+T] extends (ResultSet => ParseResult[T]) with parsers.ResultSetParserFlatMap[T] {self =>
   def map [X] (fn: T => X): Selection[X] = new parsers.MappedSelection(self, fn)
-  def expressions: List[builder.SelectExpr]
+  def expressions: Seq[ast.SqlNamedExpr[_,_]]
+  //override def toString = "Selection(" + expressions.map(_.toString).mkString(", ") + ")"
 }
 
 sealed trait SqlParam [T] {

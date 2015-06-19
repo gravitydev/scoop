@@ -26,7 +26,7 @@ final private [parsers] class ResultSetParserImpl[+T] (impl: ResultSet => ParseR
 private [scoop] class MappedSelection [T,+X] (parser: Selection[T], fn: T => X) extends Selection[X] {
   def apply (rs: ResultSet) = parser(rs).right map fn
   lazy val expressions = parser.expressions
-  override def toString = "Selection(expressions=" + expressions + ", fn=" + util.fnToString(fn) + ")"
+  //override def toString = "Selection(expressions=" + expressions + ", fn=" + util.fnToString(fn) + ")"
 }
 
 class ExprParser [+T:SqlType] (name: String) extends Selection1[T] (
@@ -35,17 +35,18 @@ class ExprParser [+T:SqlType] (name: String) extends Selection1[T] (
 
 // BOILERPLATE
 abstract class SelectionX [+T] (selectors: Selection[_]*) extends SP[T] {
-  def list: List[Selection[_]] = selectors.toList
+  def list: Seq[Selection[_]] = selectors
   def expressions = list.flatMap(_.expressions) 
-  override def toString = list.map((x: AnyRef) => x.toString).mkString(" ~ ")
+  //override def toString = list.map((x: AnyRef) => x.toString).mkString(" ~ ")
 }
 
 trait ExprSelection [+A] extends Selection[A] {self: ast.SqlNamedExpr[_,A] =>
   def >> [T](fn: A=>T) = new Selection1(apply(_) map fn, expressions)
   def ~ [X](px: SP[X]): Selection2[A,X] = new Selection2(this, px)
+  override def toString = "ExprSelection(" + this.getClass + ")"
 }
 
-class Selection1 [+A] (fn: ResultSet => ParseResult[A], val expressions: List[builder.SelectExpr] = Nil) extends SP[A] {
+class Selection1 [+A] (fn: ResultSet => ParseResult[A], val expressions: Seq[builder.SelectExpr] = Nil) extends SP[A] {
   def >> [T](fn: A=>T) = new Selection1(apply(_) map fn, expressions)
   def ~ [X](px: SP[X]): Selection2[A,X] = new Selection2(this, px)
   def apply (rs: ResultSet): ParseResult[A] = fn(rs)

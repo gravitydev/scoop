@@ -3,12 +3,13 @@ import com.gravitydev.scoop._, query._
 import org.scalatest.matchers.{Matcher, MatchResult}
 
 object ScoopMatchers {
-  class SqlMatcher (right: (String,Seq[SqlParam[_]])) extends Matcher[{def sql: String; def params: Seq[SqlParam[_]]}] {
+  class SqlMatcher (right: (String,Seq[SqlParam[_]]))(implicit dialect: SqlDialect) extends Matcher[ast.QueryNode] {
     // TODO: improve
     private def clean (s: String) = s.replaceAll("\\\n", " ").replaceAll("  ", " ").replaceAll("  ", " ").trim
 
-    def apply(left: {def sql: String; def params: Seq[SqlParam[_]]}) = {
-      val l = (clean(left.sql), left.params.toList)
+    def apply(left: ast.QueryNode) = {
+      val sql = dialect.toParameterizedSql(left)
+      val l = (clean(sql.sql), sql.params.toList)
       val r = (clean(right._1), right._2.toList)
 
       MatchResult(
@@ -19,12 +20,13 @@ object ScoopMatchers {
     }
   }
 
-  class SelectSqlMatcher (right: (String,Seq[SqlParam[_]])) extends Matcher[{def selectSql: String; def params: Seq[SqlParam[_]]}] {
+  class SelectSqlMatcher (right: (String,Seq[SqlParam[_]]))(implicit dialect: SqlDialect) extends Matcher[ast.QueryNode] {
     // TODO: improve
     private def clean (s: String) = s.replaceAll("\\\n", " ").replaceAll("  ", " ").replaceAll("  ", " ").trim
 
-    def apply(left: {def selectSql: String; def params: Seq[SqlParam[_]]}) = {
-      val l = (clean(left.selectSql), left.params.toList)
+    def apply(left: ast.QueryNode) = {
+      val sql = dialect.toAliasedParameterizedSql(left)
+      val l = (clean(sql.sql), sql.params)
       val r = (clean(right._1), right._2.toList)
 
       MatchResult(

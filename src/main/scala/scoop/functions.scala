@@ -14,6 +14,6 @@ object `package` {
 
   // why doesn't the implicit pick up SqlFragmentS.fromExpr
   def coalesce [T:SqlType](exprs: ast.SqlExpr[T]*) = 
-    query.sqlExpr[T]("COALESCE(" +~ exprs.map(SqlFragmentS.fromExpr _).reduceLeft(_ +~ ", " +~ _) +~ ")")
+    query.sqlExpr[T]("COALESCE(" +~ exprs.map(ParameterizedSql.fromExpr _).reduceLeft(_ +~ ", " +~ _) +~ ")")
 }
 
