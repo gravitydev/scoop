@@ -160,6 +160,8 @@ trait SqlExpr[X] extends SqlExprIn[X] with SqlExprOut[X] with QueryNode {self =>
 
   def like (v: SqlExpr[String])(implicit ev: SqlType[X] with SqlUnderlyingType[String]) = SqlInfixExpr[Boolean](this, v, "LIKE")
   def notLike (v: SqlExpr[String])(implicit ev: SqlType[X] with SqlUnderlyingType[String]) = SqlInfixExpr[Boolean](this, v, "NOT LIKE")
+
+  def cast [T:SqlType]: SqlExpr[T] = SqlWrappedExpr[T](this)
  
   // TODO: decimals
   def + [T,N](v: SqlExpr[T])(implicit ev1: SqlExpr[X]=>SqlExpr[N], ev2: SqlExpr[T]=>SqlExpr[N], ev3: SqlType[N]) = SqlInfixExpr[N](this, v, "+")
@@ -184,16 +186,17 @@ case class SqlWrappedExpr[T:SqlType](expr: SqlExpr[_]) extends SqlExpr[T] {
 }
 
 /** Expression that will produce a strict value when parsed out of a ResultSet */
-trait SqlParseExpr[T] extends SqlExpr[T] {
+trait SqlParseStrictExpr[T] extends SqlExpr[T] {
   def as (alias: String): SqlNamedStrictExpr[T] = SqlNamedStrictExpr[T](this, alias)
 }
 
 /** Expression that will produce an optional value when parsed out of a ResultSet */
-trait SqlOptParseExpr[T] extends SqlExpr[T] {
+trait SqlParseOptExpr[T] extends SqlExpr[T] {
   def as (alias: String): SqlNamedOptExpr[T] = new SqlNamedOptExpr[T](this, alias)
 }
 
-abstract class SqlBaseExpr[T:SqlType] extends SqlParseExpr[T] {
+/** Just a convenience function that holds the sqlType */
+private [scoop] abstract class SqlBaseExpr[T:SqlType] extends SqlParseStrictExpr[T] {
   val sqlTpe = SqlType[T]
 }
 
@@ -204,7 +207,7 @@ case class SqlQueryExpr[I:SqlType] (query: Query[I]) extends SqlExpr[I] {
 }
 
 case class SqlRawExpr[X:SqlType] (sql: ParameterizedSql) extends SqlBaseExpr[X]
-case class SqlRawOptExpr[X:SqlType] (sql: ParameterizedSql) extends SqlOptParseExpr[X] {
+case class SqlRawOptExpr[X:SqlType] (sql: ParameterizedSql) extends SqlParseOptExpr[X] {
   val sqlTpe = SqlType[X]
 }
 
@@ -274,7 +277,7 @@ sealed abstract class SqlCol[T:SqlType] (val cast: Option[String], val table: Sq
 }
 
 class SqlNonNullableCol[T:SqlType](val columnName: String, cast: Option[String], table: SqlTable[_], explicitAlias: String = null) 
-    extends SqlCol[T] (cast, table, explicitAlias) with SqlParseExpr[T] with SqlNamedExpr[T,T] with Selection[T] {
+    extends SqlCol[T] (cast, table, explicitAlias) with SqlParseStrictExpr[T] with SqlNamedExpr[T,T] with Selection[T] {
 
   override def toString = "Col(" + columnName + " as " + name + ")"
 
@@ -285,7 +288,7 @@ class SqlNonNullableCol[T:SqlType](val columnName: String, cast: Option[String],
 }
 
 class SqlNullableCol[T:SqlType](val columnName: String, cast: Option[String], table: SqlTable[_], explicitAlias: String) 
-    extends SqlCol[T] (cast, table, explicitAlias) with SqlOptParseExpr[T] with SqlNamedExpr[T,Option[T]] with Selection[Option[T]] {
+    extends SqlCol[T] (cast, table, explicitAlias) with SqlParseOptExpr[T] with SqlNamedExpr[T,Option[T]] with Selection[Option[T]] {
 
   //override def toString = "Col("+ columnName + " as " + name +" : Nullable)"
 

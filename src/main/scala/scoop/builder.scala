@@ -46,9 +46,8 @@ class DeleteBuilder (tb: ast.TableT) {
 
 trait QueryBuilderBase {
   private type S[X] = parsers.ExprSelection[X]
-  //private type S[X] = Selection[X]
 
-  def select [A](a: Selection[A]) = buildQuery(a)
+  def select [A](a: S[A]) = buildQuery(a)
   def select [A,B](a: S[A], b: S[B]) = buildQuery(a~b)
   def select [A,B,C](a: S[A], b: S[B], c: S[C]) = buildQuery(a~b~c)
   def select [A,B,C,D](a: S[A], b: S[B], c: S[C], d: S[D]) = buildQuery(a~b~c~d)

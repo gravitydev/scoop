@@ -5,7 +5,7 @@ import java.sql.{Connection, Date, Timestamp, ResultSet}
 import scala.collection.mutable.ListBuffer
 import util.{ResultSetIterator, QueryResult}
 import scala.collection._, 
-  ast.{Query, Join, SqlType, SqlParseExpr, SqlLiteralExpr, SqlCol, SqlRawExpr, SqlNamedExpr}
+  ast.{Query, Join, SqlType, SqlParseStrictExpr, SqlLiteralExpr, SqlCol, SqlRawExpr, SqlNamedExpr}
 import builder.{DeleteBuilder, QueryBuilder, InsertBuilder, UpdateBuilder}
 
 object `package` extends builder.QueryBuilderBase {
@@ -18,9 +18,9 @@ object `package` extends builder.QueryBuilderBase {
   implicit def stringToFragment (s: String) = ParameterizedSql(s, Nil)
  
   // kind of hacky 
-  implicit def intToLongExpr (a: SqlExpr[Int]): SqlExpr[Long] = new ast.SqlWrappedExpr[Long](a) 
+  implicit def intToLongExpr (a: SqlExpr[Int]): SqlExpr[Long] = a.cast[Long] 
 
-  implicit def baseToSqlLit [T](base: T)(implicit sqlType: SqlType[T]): SqlParseExpr[T] = SqlLiteralExpr(base)
+  implicit def baseToSqlLit [T](base: T)(implicit sqlType: SqlType[T]): SqlParseStrictExpr[T] = SqlLiteralExpr(base)
   implicit def tableToWrapped [T <: ast.TableT] (t: T) = new TableOps(t)
   implicit def optToSqlLit [T](base: Option[T])(implicit sqlType: SqlType[T]) = base map {x => SqlLiteralExpr(x)}
   implicit def baseToParam [T](base: T)(implicit sqlType: SqlType[T]) = SqlSingleParam(base)
@@ -41,13 +41,12 @@ object `package` extends builder.QueryBuilderBase {
   def deleteFrom (table: ast.TableT) = new DeleteBuilder(table)
 
   @deprecated("Use sqlExpr", "1.0") 
-  def sql [T:SqlType] (sql: String): SqlParseExpr[T] = sqlExpr(ParameterizedSql(sql, Nil))
+  def sql [T:SqlType] (sql: String): SqlParseStrictExpr[T] = sqlExpr(ParameterizedSql(sql, Nil))
 
   @deprecated("Use sqlExpr", "1.0")
-  def sql [T:SqlType] (sql: ParameterizedSql): SqlParseExpr[T] = sqlExpr(sql)
+  def sql [T:SqlType] (sql: ParameterizedSql): SqlParseStrictExpr[T] = sqlExpr(sql)
 
-  //def sqlExpr [T:SqlType] (sql: String): SqlParseExpr[T] = new SqlRawExpr[T](sql, Nil)
-  def sqlExpr [T:SqlType] (sql: ParameterizedSql): SqlParseExpr[T] = new SqlRawExpr[T](sql)
+  def sqlExpr [T:SqlType] (sql: ParameterizedSql): SqlParseStrictExpr[T] = SqlRawExpr[T](sql)
  
   protected def buildQuery [X](sel: Selection[X]) = Query(sel)
   

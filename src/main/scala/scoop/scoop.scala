@@ -1,7 +1,7 @@
 package com.gravitydev.scoop
 
 import java.sql.{ResultSet, PreparedStatement, Types, Timestamp, Date}
-import ast.{SqlNamedExpr, SqlNamedQuery, SqlParseExpr, SqlNonNullableCol, SqlNullableCol, SqlUnderlyingType}
+import ast.{SqlNamedExpr, SqlNamedQuery, SqlParseStrictExpr, SqlNonNullableCol, SqlNullableCol, SqlUnderlyingType}
 import parsers.Selection1
 
 object `package` {
@@ -86,7 +86,7 @@ object `package` {
   /** Turns a query into an expression */
   implicit def queryToExpr[T:SqlType](q: ast.Query[T]): ast.SqlExpr[T] = new ast.SqlQueryExpr(q) 
 
-  implicit def exprToParseExpr [T](expr: SqlExpr[T]): SqlParseExpr[T] = new SqlParseExpr [T] {
+  implicit def exprToParseExpr [T](expr: SqlExpr[T]): SqlParseStrictExpr[T] = new SqlParseStrictExpr [T] {
     val sqlTpe = expr.sqlTpe
     //val sql = expr.sql
   }
