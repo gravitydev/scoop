@@ -85,6 +85,11 @@ trait BaseSqlDialect extends SqlDialect {
         "VALUES" <+>
         parens( ssep( assignments.toList.map(_ => string("?")), comma <> " ") )
 
+      case ast.InsertWithQuery(table, cols, query) => 
+        "INSERT INTO" <+> table <+> 
+        parens( ssep( cols.map(_.columnName).map(string), comma <> " ") ) <@>
+        sql(query) 
+
       case ast.Update (table, assignments, predicate) =>
         "UPDATE" <+> table._tableName <+> "SET" <+> 
         ssep( 
@@ -131,6 +136,7 @@ trait BaseSqlDialect extends SqlDialect {
     case ast.Join(queryable, onPred, _) => params(queryable) ++ params(onPred)
     case ast.Delete(table, pred) => params(pred)
     case ast.Insert(_, assignments) => assignments.flatMap(params)
+    case ast.InsertWithQuery(_, cols, query) => cols.flatMap(params) ++ params(query)
     case ast.Update (_, assignments, predicate) => assignments.flatMap(params) ++ predicate.toList.flatMap(params)
     case ast.SqlUnaryExpr(l,_,_) => params(l) 
     case ast.SqlRawExpr(expr) => expr.params
@@ -138,6 +144,8 @@ trait BaseSqlDialect extends SqlDialect {
     case ast.SqlOrdering(expr, _) => params(expr) 
     case ast.SqlQueryExpr(query) => params(query)
     case ast.SqlWrappedExpr(expr) => params(expr)
+    case ast.SqlNamedQuery(q,_) => params(q)
+    case ast.SqlNamedQueryExpr(q,_) => params(q)
   }
 
   def aliasedSql (n: ast.QueryNode): Doc = n match {

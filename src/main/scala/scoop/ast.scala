@@ -83,8 +83,7 @@ case class Upsert (
 case class InsertWithQuery (
   into: String,
   columns: List[ast.SqlCol[_]],
-  query: ast.Query[_],
-  comment: Option[String] = None
+  query: ast.Query[_]
 ) extends InsertBase
 
 case class Update (
