@@ -2,12 +2,11 @@ package com.gravitydev.scoop
 package parsers
 
 import ast.SqlType
-import builder.SelectExpr
 import java.sql.ResultSet
 
 object `package` {
   private [parsers] type RP[+T] = ResultSetParser[T]
-  private [parsers] type SP[+T] = Selection[T]
+  private [parsers] type S[+T] = Selection[T]
  
   implicit def rightBiasParseResult [T](r: ParseResult[T]): Either.RightProjection[String,T] = r.right
 
@@ -34,22 +33,27 @@ class ExprParser [+T:SqlType] (name: String) extends Selection1[T] (
 )
 
 // BOILERPLATE
-abstract class SelectionX [+T] (selectors: Selection[_]*) extends SP[T] {
+abstract class SelectionX [+T] (selectors: Selection[_]*) extends S[T] {
   def list: Seq[Selection[_]] = selectors
   def expressions = list.flatMap(_.expressions) 
   //override def toString = list.map((x: AnyRef) => x.toString).mkString(" ~ ")
 }
 
-trait ExprSelection [+A] extends Selection[A] {self: ast.SqlNamedExpr[_,A] =>
+trait SelectionSingle [+A] extends S[A] {
+  def >> [T](fn: A=>T): Selection1[T]
+  def ~ [X](px: S[X]): Selection2[A,X]
+}
+
+trait ExprSelection [+A] extends SelectionSingle[A] {self: ast.SqlNamedExpr[_,A] =>
   def >> [T](fn: A=>T) = new Selection1(apply(_) map fn, expressions)
-  def ~ [X](px: SP[X]): Selection2[A,X] = new Selection2(this, px)
+  def ~ [X](px: S[X]): Selection2[A,X] = new Selection2(this, px)
   override def toString = "ExprSelection(" + this.getClass + ")"
 }
 
-class Selection1 [+A] (fn: ResultSet => ParseResult[A], val expressions: Seq[builder.SelectExpr] = Nil) extends SP[A] {
-  def >> [T](fn: A=>T) = new Selection1(apply(_) map fn, expressions)
-  def ~ [X](px: SP[X]): Selection2[A,X] = new Selection2(this, px)
+class Selection1 [+A] (fn: ResultSet => ParseResult[A], val expressions: Seq[ast.SqlNamedExpr[_,_]] = Nil) extends SelectionSingle[A] {
   def apply (rs: ResultSet): ParseResult[A] = fn(rs)
+  def >> [T](fn: A=>T) = new Selection1(apply(_) map fn, expressions)
+  def ~ [X](px: S[X]): Selection2[A,X] = new Selection2(this, px)
   override def toString = "Selection1(fn=" + fn + ", expressions=" + expressions + ")"
 }
 

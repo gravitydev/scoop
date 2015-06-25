@@ -6,8 +6,6 @@ import com.gravitydev.scoop.util.QueryResult
 import java.sql.{Connection, ResultSet}
 
 object `package` {
-  type SelectExpr = ast.SqlNamedExpr[_,_]
-
   type Query[T] = ast.Query[T]
 
   /** Clean up null assignments because of Option[SqlAssignment[_]] */
@@ -45,7 +43,7 @@ class DeleteBuilder (tb: ast.TableT) {
 
 
 trait QueryBuilderBase {
-  private type S[X] = parsers.ExprSelection[X]
+  private type S[X] = parsers.SelectionSingle[X]
 
   def select [A](a: S[A]) = buildQuery(a)
   def select [A,B](a: S[A], b: S[B]) = buildQuery(a~b)

@@ -2,6 +2,7 @@ package com.gravitydev.scoop
 
 import org.kiama.output.PrettyPrinter
 import com.gravitydev.scoop.query.ParameterizedSql
+import scala.Predef.{any2stringadd => _}
 
 trait SqlDialect extends PrettyPrinter {
   def sql (n: ast.QueryNode): Doc
@@ -83,7 +84,7 @@ trait BaseSqlDialect extends SqlDialect {
         "INSERT INTO" <+> table <+> 
         parens( ssep( assignments.toList.map(_.col.columnName).map(string), comma <> " ") ) <+>
         "VALUES" <+>
-        parens( ssep( assignments.toList.map(_ => string("?")), comma <> " ") )
+        parens( ssep( assignments.toList.map(a => sql(a.value)), comma <> " ") )
 
       case ast.InsertWithQuery(table, cols, query) => 
         "INSERT INTO" <+> table <+> 
@@ -108,7 +109,13 @@ trait BaseSqlDialect extends SqlDialect {
 
       case ast.SqlQueryExpr(query) => parens( nest(line <> sql(query)) <> line )
 
+      case ast.SqlNamedQueryExpr(query,_) => sql(query) 
+
+      case ast.SqlNamedQuery(q,_) => sql(q)
+
       case ast.SqlWrappedExpr(expr) => sql(expr)
+
+      case ast.SqlLiteralSetExpr(exprs) => parens( nest( ssep( List.fill(exprs.size)("?").map(string), comma <> " " ) ) )
     })
   }
 
@@ -146,11 +153,12 @@ trait BaseSqlDialect extends SqlDialect {
     case ast.SqlWrappedExpr(expr) => params(expr)
     case ast.SqlNamedQuery(q,_) => params(q)
     case ast.SqlNamedQueryExpr(q,_) => params(q)
+    case x @ ast.SqlLiteralSetExpr(exprs) => x.toParams
   }
 
   def aliasedSql (n: ast.QueryNode): Doc = n match {
     case ast.SqlNamedStrictExpr(expr @ ast.SqlInfixExpr(_,_,_), name) => parens( sql(expr) ) <+> "as" <+> name
-    case x @ ast.SqlNamedQueryExpr(query, name) => parens( sql(query) ) <+> "as" <+> name
+    case x @ ast.SqlNamedQueryExpr(query, name) => sql(query) <+> "as" <+> name
     case x @ ast.SqlNamedStrictExpr(expr, name) => sql(expr) <+> "as" <+> name
     case col: ast.SqlCol[_] => sql(col) <+> "as" <+> col.name
     case t: ast.TableT => t.fromSql  

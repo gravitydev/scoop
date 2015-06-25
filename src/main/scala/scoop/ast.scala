@@ -272,7 +272,7 @@ sealed abstract class SqlCol[T:SqlType] (val cast: Option[String], val table: Sq
 
   val params = Nil
 
-  def expressions: Seq[builder.SelectExpr] // = List( new query.SelectExprS(sql + " as " + name) )
+  def expressions: Seq[ast.SqlNamedExpr[_,_]] // = List( new query.SelectExprS(sql + " as " + name) )
 }
 
 class SqlNonNullableCol[T:SqlType](val columnName: String, cast: Option[String], table: SqlTable[_], explicitAlias: String = null) 
@@ -303,12 +303,7 @@ case class SqlLiteralExpr [T:SqlType] (v: T) extends SqlBaseExpr[T] {
 }
 
 case class SqlLiteralSetExpr [T:SqlType] (v: Set[T]) extends SqlBaseExpr[Set[T]] {
-  /*
-  def sql = ParameterizedSql(
-    v.toList.map(_ => "?").mkString("(", ", ", ")"),
-    SqlSetParam(v).toList
-  )
-  */
+  def toParams = SqlSetParam(v).toList
 }
 
 case class Query [T](
@@ -325,7 +320,6 @@ case class Query [T](
 ) extends QueryNode {
 
   def forUpdate () = copy(forUpdateLock = true)
-  //def selectDistinct (exprs: SelectExpr*) = copy(sel = exprs, distinct=true)
   def distinct = copy(selectDistinct=true)
 
   def as (alias: String) = new ast.SqlNamedQuery[T](this, alias) 

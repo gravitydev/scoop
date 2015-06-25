@@ -7,16 +7,16 @@ println(
   "import java.sql.ResultSet\n"
 )
 
-val atoz = 'a' to 'z'
+val atoz = ('a' to 'z').filterNot(_=='s')
 
 for (x <- 2 to 22) {
   val tpes = atoz take x
   println(
     s"class Selection${x} [+${tpes.map(_.toUpper).mkString(",")}] " +
-    s"(${tpes.map(t => "p"+t+":SP["+t.toUpper+"]").mkString(",")}) " +
+    s"(${tpes.map(t => "p"+t+":S["+t.toUpper+"]").mkString(",")}) " +
     s"extends SelectionX[(${tpes.map(_.toUpper).mkString(",")})] (${tpes.map("p"+_).mkString(",")}) {\n" +
     s"  def >> [X](fn: (${tpes.map(_.toUpper).mkString(",")})=>X) = new Selection1(apply(_) map fn.tupled, expressions)\n" +
-    (if (x != 22) s"  def ~ [X](px: SP[X]) = new Selection${x+1}(${tpes.map("p"+_).mkString(",")},px)\n" else "") +
+    (if (x != 22) s"  def ~ [X](px: S[X]) = new Selection${x+1}(${tpes.map("p"+_).mkString(",")},px)\n" else "") +
     s"  def apply (rs: ResultSet) = for (${tpes.map(z => z+"<-p"+z+"(rs)").mkString(";")}) yield (${tpes.mkString(",")})\n" +
     s"}"
   )

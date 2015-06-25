@@ -1,7 +1,6 @@
 package com.gravitydev.scoop
 package ast
 
-import builder.SelectExpr
 import query.{stringToFragment, ParameterizedSql}
 import java.sql.ResultSet
 
@@ -22,9 +21,7 @@ trait SqlNamedExpr [I,+O] extends SqlExpr[I] with SqlNamed with parsers.ExprSele
 
   def name: String
 
-  //def selectSql = sql.sql + " as " + name
-
-  def expressions = List(this) //List(new SelectExpr(ParameterizedSql(selectSql, params)))
+  def expressions = List(this)
 
   // this should only be applicable to sub-queries
   def apply [X:SqlType](column: String) = new SqlRawExpr[X](name+"."+column)

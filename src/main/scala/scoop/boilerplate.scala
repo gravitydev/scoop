@@ -6,107 +6,107 @@ package parsers
 
 import java.sql.ResultSet
 
-class Selection2 [+A,B] (pa:SP[A],pb:SP[B]) extends SelectionX[(A,B)] (pa,pb) {
+class Selection2 [+A,B] (pa:S[A],pb:S[B]) extends SelectionX[(A,B)] (pa,pb) {
   def >> [X](fn: (A,B)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
-  def ~ [X](px: SP[X]) = new Selection3(pa,pb,px)
+  def ~ [X](px: S[X]) = new Selection3(pa,pb,px)
   def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs)) yield (a,b)
 }
-class Selection3 [+A,B,C] (pa:SP[A],pb:SP[B],pc:SP[C]) extends SelectionX[(A,B,C)] (pa,pb,pc) {
+class Selection3 [+A,B,C] (pa:S[A],pb:S[B],pc:S[C]) extends SelectionX[(A,B,C)] (pa,pb,pc) {
   def >> [X](fn: (A,B,C)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
-  def ~ [X](px: SP[X]) = new Selection4(pa,pb,pc,px)
+  def ~ [X](px: S[X]) = new Selection4(pa,pb,pc,px)
   def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs)) yield (a,b,c)
 }
-class Selection4 [+A,B,C,D] (pa:SP[A],pb:SP[B],pc:SP[C],pd:SP[D]) extends SelectionX[(A,B,C,D)] (pa,pb,pc,pd) {
+class Selection4 [+A,B,C,D] (pa:S[A],pb:S[B],pc:S[C],pd:S[D]) extends SelectionX[(A,B,C,D)] (pa,pb,pc,pd) {
   def >> [X](fn: (A,B,C,D)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
-  def ~ [X](px: SP[X]) = new Selection5(pa,pb,pc,pd,px)
+  def ~ [X](px: S[X]) = new Selection5(pa,pb,pc,pd,px)
   def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs)) yield (a,b,c,d)
 }
-class Selection5 [+A,B,C,D,E] (pa:SP[A],pb:SP[B],pc:SP[C],pd:SP[D],pe:SP[E]) extends SelectionX[(A,B,C,D,E)] (pa,pb,pc,pd,pe) {
+class Selection5 [+A,B,C,D,E] (pa:S[A],pb:S[B],pc:S[C],pd:S[D],pe:S[E]) extends SelectionX[(A,B,C,D,E)] (pa,pb,pc,pd,pe) {
   def >> [X](fn: (A,B,C,D,E)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
-  def ~ [X](px: SP[X]) = new Selection6(pa,pb,pc,pd,pe,px)
+  def ~ [X](px: S[X]) = new Selection6(pa,pb,pc,pd,pe,px)
   def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs);e<-pe(rs)) yield (a,b,c,d,e)
 }
-class Selection6 [+A,B,C,D,E,F] (pa:SP[A],pb:SP[B],pc:SP[C],pd:SP[D],pe:SP[E],pf:SP[F]) extends SelectionX[(A,B,C,D,E,F)] (pa,pb,pc,pd,pe,pf) {
+class Selection6 [+A,B,C,D,E,F] (pa:S[A],pb:S[B],pc:S[C],pd:S[D],pe:S[E],pf:S[F]) extends SelectionX[(A,B,C,D,E,F)] (pa,pb,pc,pd,pe,pf) {
   def >> [X](fn: (A,B,C,D,E,F)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
-  def ~ [X](px: SP[X]) = new Selection7(pa,pb,pc,pd,pe,pf,px)
+  def ~ [X](px: S[X]) = new Selection7(pa,pb,pc,pd,pe,pf,px)
   def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs);e<-pe(rs);f<-pf(rs)) yield (a,b,c,d,e,f)
 }
-class Selection7 [+A,B,C,D,E,F,G] (pa:SP[A],pb:SP[B],pc:SP[C],pd:SP[D],pe:SP[E],pf:SP[F],pg:SP[G]) extends SelectionX[(A,B,C,D,E,F,G)] (pa,pb,pc,pd,pe,pf,pg) {
+class Selection7 [+A,B,C,D,E,F,G] (pa:S[A],pb:S[B],pc:S[C],pd:S[D],pe:S[E],pf:S[F],pg:S[G]) extends SelectionX[(A,B,C,D,E,F,G)] (pa,pb,pc,pd,pe,pf,pg) {
   def >> [X](fn: (A,B,C,D,E,F,G)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
-  def ~ [X](px: SP[X]) = new Selection8(pa,pb,pc,pd,pe,pf,pg,px)
+  def ~ [X](px: S[X]) = new Selection8(pa,pb,pc,pd,pe,pf,pg,px)
   def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs);e<-pe(rs);f<-pf(rs);g<-pg(rs)) yield (a,b,c,d,e,f,g)
 }
-class Selection8 [+A,B,C,D,E,F,G,H] (pa:SP[A],pb:SP[B],pc:SP[C],pd:SP[D],pe:SP[E],pf:SP[F],pg:SP[G],ph:SP[H]) extends SelectionX[(A,B,C,D,E,F,G,H)] (pa,pb,pc,pd,pe,pf,pg,ph) {
+class Selection8 [+A,B,C,D,E,F,G,H] (pa:S[A],pb:S[B],pc:S[C],pd:S[D],pe:S[E],pf:S[F],pg:S[G],ph:S[H]) extends SelectionX[(A,B,C,D,E,F,G,H)] (pa,pb,pc,pd,pe,pf,pg,ph) {
   def >> [X](fn: (A,B,C,D,E,F,G,H)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
-  def ~ [X](px: SP[X]) = new Selection9(pa,pb,pc,pd,pe,pf,pg,ph,px)
+  def ~ [X](px: S[X]) = new Selection9(pa,pb,pc,pd,pe,pf,pg,ph,px)
   def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs);e<-pe(rs);f<-pf(rs);g<-pg(rs);h<-ph(rs)) yield (a,b,c,d,e,f,g,h)
 }
-class Selection9 [+A,B,C,D,E,F,G,H,I] (pa:SP[A],pb:SP[B],pc:SP[C],pd:SP[D],pe:SP[E],pf:SP[F],pg:SP[G],ph:SP[H],pi:SP[I]) extends SelectionX[(A,B,C,D,E,F,G,H,I)] (pa,pb,pc,pd,pe,pf,pg,ph,pi) {
+class Selection9 [+A,B,C,D,E,F,G,H,I] (pa:S[A],pb:S[B],pc:S[C],pd:S[D],pe:S[E],pf:S[F],pg:S[G],ph:S[H],pi:S[I]) extends SelectionX[(A,B,C,D,E,F,G,H,I)] (pa,pb,pc,pd,pe,pf,pg,ph,pi) {
   def >> [X](fn: (A,B,C,D,E,F,G,H,I)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
-  def ~ [X](px: SP[X]) = new Selection10(pa,pb,pc,pd,pe,pf,pg,ph,pi,px)
+  def ~ [X](px: S[X]) = new Selection10(pa,pb,pc,pd,pe,pf,pg,ph,pi,px)
   def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs);e<-pe(rs);f<-pf(rs);g<-pg(rs);h<-ph(rs);i<-pi(rs)) yield (a,b,c,d,e,f,g,h,i)
 }
-class Selection10 [+A,B,C,D,E,F,G,H,I,J] (pa:SP[A],pb:SP[B],pc:SP[C],pd:SP[D],pe:SP[E],pf:SP[F],pg:SP[G],ph:SP[H],pi:SP[I],pj:SP[J]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj) {
+class Selection10 [+A,B,C,D,E,F,G,H,I,J] (pa:S[A],pb:S[B],pc:S[C],pd:S[D],pe:S[E],pf:S[F],pg:S[G],ph:S[H],pi:S[I],pj:S[J]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj) {
   def >> [X](fn: (A,B,C,D,E,F,G,H,I,J)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
-  def ~ [X](px: SP[X]) = new Selection11(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,px)
+  def ~ [X](px: S[X]) = new Selection11(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,px)
   def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs);e<-pe(rs);f<-pf(rs);g<-pg(rs);h<-ph(rs);i<-pi(rs);j<-pj(rs)) yield (a,b,c,d,e,f,g,h,i,j)
 }
-class Selection11 [+A,B,C,D,E,F,G,H,I,J,K] (pa:SP[A],pb:SP[B],pc:SP[C],pd:SP[D],pe:SP[E],pf:SP[F],pg:SP[G],ph:SP[H],pi:SP[I],pj:SP[J],pk:SP[K]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk) {
+class Selection11 [+A,B,C,D,E,F,G,H,I,J,K] (pa:S[A],pb:S[B],pc:S[C],pd:S[D],pe:S[E],pf:S[F],pg:S[G],ph:S[H],pi:S[I],pj:S[J],pk:S[K]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk) {
   def >> [X](fn: (A,B,C,D,E,F,G,H,I,J,K)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
-  def ~ [X](px: SP[X]) = new Selection12(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,px)
+  def ~ [X](px: S[X]) = new Selection12(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,px)
   def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs);e<-pe(rs);f<-pf(rs);g<-pg(rs);h<-ph(rs);i<-pi(rs);j<-pj(rs);k<-pk(rs)) yield (a,b,c,d,e,f,g,h,i,j,k)
 }
-class Selection12 [+A,B,C,D,E,F,G,H,I,J,K,L] (pa:SP[A],pb:SP[B],pc:SP[C],pd:SP[D],pe:SP[E],pf:SP[F],pg:SP[G],ph:SP[H],pi:SP[I],pj:SP[J],pk:SP[K],pl:SP[L]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K,L)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl) {
+class Selection12 [+A,B,C,D,E,F,G,H,I,J,K,L] (pa:S[A],pb:S[B],pc:S[C],pd:S[D],pe:S[E],pf:S[F],pg:S[G],ph:S[H],pi:S[I],pj:S[J],pk:S[K],pl:S[L]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K,L)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl) {
   def >> [X](fn: (A,B,C,D,E,F,G,H,I,J,K,L)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
-  def ~ [X](px: SP[X]) = new Selection13(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,px)
+  def ~ [X](px: S[X]) = new Selection13(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,px)
   def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs);e<-pe(rs);f<-pf(rs);g<-pg(rs);h<-ph(rs);i<-pi(rs);j<-pj(rs);k<-pk(rs);l<-pl(rs)) yield (a,b,c,d,e,f,g,h,i,j,k,l)
 }
-class Selection13 [+A,B,C,D,E,F,G,H,I,J,K,L,M] (pa:SP[A],pb:SP[B],pc:SP[C],pd:SP[D],pe:SP[E],pf:SP[F],pg:SP[G],ph:SP[H],pi:SP[I],pj:SP[J],pk:SP[K],pl:SP[L],pm:SP[M]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K,L,M)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm) {
+class Selection13 [+A,B,C,D,E,F,G,H,I,J,K,L,M] (pa:S[A],pb:S[B],pc:S[C],pd:S[D],pe:S[E],pf:S[F],pg:S[G],ph:S[H],pi:S[I],pj:S[J],pk:S[K],pl:S[L],pm:S[M]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K,L,M)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm) {
   def >> [X](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
-  def ~ [X](px: SP[X]) = new Selection14(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,px)
+  def ~ [X](px: S[X]) = new Selection14(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,px)
   def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs);e<-pe(rs);f<-pf(rs);g<-pg(rs);h<-ph(rs);i<-pi(rs);j<-pj(rs);k<-pk(rs);l<-pl(rs);m<-pm(rs)) yield (a,b,c,d,e,f,g,h,i,j,k,l,m)
 }
-class Selection14 [+A,B,C,D,E,F,G,H,I,J,K,L,M,N] (pa:SP[A],pb:SP[B],pc:SP[C],pd:SP[D],pe:SP[E],pf:SP[F],pg:SP[G],ph:SP[H],pi:SP[I],pj:SP[J],pk:SP[K],pl:SP[L],pm:SP[M],pn:SP[N]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn) {
+class Selection14 [+A,B,C,D,E,F,G,H,I,J,K,L,M,N] (pa:S[A],pb:S[B],pc:S[C],pd:S[D],pe:S[E],pf:S[F],pg:S[G],ph:S[H],pi:S[I],pj:S[J],pk:S[K],pl:S[L],pm:S[M],pn:S[N]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn) {
   def >> [X](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
-  def ~ [X](px: SP[X]) = new Selection15(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,px)
+  def ~ [X](px: S[X]) = new Selection15(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,px)
   def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs);e<-pe(rs);f<-pf(rs);g<-pg(rs);h<-ph(rs);i<-pi(rs);j<-pj(rs);k<-pk(rs);l<-pl(rs);m<-pm(rs);n<-pn(rs)) yield (a,b,c,d,e,f,g,h,i,j,k,l,m,n)
 }
-class Selection15 [+A,B,C,D,E,F,G,H,I,J,K,L,M,N,O] (pa:SP[A],pb:SP[B],pc:SP[C],pd:SP[D],pe:SP[E],pf:SP[F],pg:SP[G],ph:SP[H],pi:SP[I],pj:SP[J],pk:SP[K],pl:SP[L],pm:SP[M],pn:SP[N],po:SP[O]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po) {
+class Selection15 [+A,B,C,D,E,F,G,H,I,J,K,L,M,N,O] (pa:S[A],pb:S[B],pc:S[C],pd:S[D],pe:S[E],pf:S[F],pg:S[G],ph:S[H],pi:S[I],pj:S[J],pk:S[K],pl:S[L],pm:S[M],pn:S[N],po:S[O]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po) {
   def >> [X](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
-  def ~ [X](px: SP[X]) = new Selection16(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,px)
+  def ~ [X](px: S[X]) = new Selection16(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,px)
   def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs);e<-pe(rs);f<-pf(rs);g<-pg(rs);h<-ph(rs);i<-pi(rs);j<-pj(rs);k<-pk(rs);l<-pl(rs);m<-pm(rs);n<-pn(rs);o<-po(rs)) yield (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o)
 }
-class Selection16 [+A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P] (pa:SP[A],pb:SP[B],pc:SP[C],pd:SP[D],pe:SP[E],pf:SP[F],pg:SP[G],ph:SP[H],pi:SP[I],pj:SP[J],pk:SP[K],pl:SP[L],pm:SP[M],pn:SP[N],po:SP[O],pp:SP[P]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp) {
+class Selection16 [+A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P] (pa:S[A],pb:S[B],pc:S[C],pd:S[D],pe:S[E],pf:S[F],pg:S[G],ph:S[H],pi:S[I],pj:S[J],pk:S[K],pl:S[L],pm:S[M],pn:S[N],po:S[O],pp:S[P]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp) {
   def >> [X](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
-  def ~ [X](px: SP[X]) = new Selection17(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,px)
+  def ~ [X](px: S[X]) = new Selection17(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,px)
   def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs);e<-pe(rs);f<-pf(rs);g<-pg(rs);h<-ph(rs);i<-pi(rs);j<-pj(rs);k<-pk(rs);l<-pl(rs);m<-pm(rs);n<-pn(rs);o<-po(rs);p<-pp(rs)) yield (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p)
 }
-class Selection17 [+A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q] (pa:SP[A],pb:SP[B],pc:SP[C],pd:SP[D],pe:SP[E],pf:SP[F],pg:SP[G],ph:SP[H],pi:SP[I],pj:SP[J],pk:SP[K],pl:SP[L],pm:SP[M],pn:SP[N],po:SP[O],pp:SP[P],pq:SP[Q]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,pq) {
+class Selection17 [+A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q] (pa:S[A],pb:S[B],pc:S[C],pd:S[D],pe:S[E],pf:S[F],pg:S[G],ph:S[H],pi:S[I],pj:S[J],pk:S[K],pl:S[L],pm:S[M],pn:S[N],po:S[O],pp:S[P],pq:S[Q]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,pq) {
   def >> [X](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
-  def ~ [X](px: SP[X]) = new Selection18(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,pq,px)
+  def ~ [X](px: S[X]) = new Selection18(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,pq,px)
   def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs);e<-pe(rs);f<-pf(rs);g<-pg(rs);h<-ph(rs);i<-pi(rs);j<-pj(rs);k<-pk(rs);l<-pl(rs);m<-pm(rs);n<-pn(rs);o<-po(rs);p<-pp(rs);q<-pq(rs)) yield (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q)
 }
-class Selection18 [+A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R] (pa:SP[A],pb:SP[B],pc:SP[C],pd:SP[D],pe:SP[E],pf:SP[F],pg:SP[G],ph:SP[H],pi:SP[I],pj:SP[J],pk:SP[K],pl:SP[L],pm:SP[M],pn:SP[N],po:SP[O],pp:SP[P],pq:SP[Q],pr:SP[R]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,pq,pr) {
+class Selection18 [+A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R] (pa:S[A],pb:S[B],pc:S[C],pd:S[D],pe:S[E],pf:S[F],pg:S[G],ph:S[H],pi:S[I],pj:S[J],pk:S[K],pl:S[L],pm:S[M],pn:S[N],po:S[O],pp:S[P],pq:S[Q],pr:S[R]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,pq,pr) {
   def >> [X](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
-  def ~ [X](px: SP[X]) = new Selection19(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,pq,pr,px)
+  def ~ [X](px: S[X]) = new Selection19(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,pq,pr,px)
   def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs);e<-pe(rs);f<-pf(rs);g<-pg(rs);h<-ph(rs);i<-pi(rs);j<-pj(rs);k<-pk(rs);l<-pl(rs);m<-pm(rs);n<-pn(rs);o<-po(rs);p<-pp(rs);q<-pq(rs);r<-pr(rs)) yield (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r)
 }
-class Selection19 [+A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S] (pa:SP[A],pb:SP[B],pc:SP[C],pd:SP[D],pe:SP[E],pf:SP[F],pg:SP[G],ph:SP[H],pi:SP[I],pj:SP[J],pk:SP[K],pl:SP[L],pm:SP[M],pn:SP[N],po:SP[O],pp:SP[P],pq:SP[Q],pr:SP[R],ps:SP[S]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,pq,pr,ps) {
-  def >> [X](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
-  def ~ [X](px: SP[X]) = new Selection20(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,pq,pr,ps,px)
-  def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs);e<-pe(rs);f<-pf(rs);g<-pg(rs);h<-ph(rs);i<-pi(rs);j<-pj(rs);k<-pk(rs);l<-pl(rs);m<-pm(rs);n<-pn(rs);o<-po(rs);p<-pp(rs);q<-pq(rs);r<-pr(rs);s<-ps(rs)) yield (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s)
+class Selection19 [+A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,T] (pa:S[A],pb:S[B],pc:S[C],pd:S[D],pe:S[E],pf:S[F],pg:S[G],ph:S[H],pi:S[I],pj:S[J],pk:S[K],pl:S[L],pm:S[M],pn:S[N],po:S[O],pp:S[P],pq:S[Q],pr:S[R],pt:S[T]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,T)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,pq,pr,pt) {
+  def >> [X](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,T)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
+  def ~ [X](px: S[X]) = new Selection20(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,pq,pr,pt,px)
+  def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs);e<-pe(rs);f<-pf(rs);g<-pg(rs);h<-ph(rs);i<-pi(rs);j<-pj(rs);k<-pk(rs);l<-pl(rs);m<-pm(rs);n<-pn(rs);o<-po(rs);p<-pp(rs);q<-pq(rs);r<-pr(rs);t<-pt(rs)) yield (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,t)
 }
-class Selection20 [+A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T] (pa:SP[A],pb:SP[B],pc:SP[C],pd:SP[D],pe:SP[E],pf:SP[F],pg:SP[G],ph:SP[H],pi:SP[I],pj:SP[J],pk:SP[K],pl:SP[L],pm:SP[M],pn:SP[N],po:SP[O],pp:SP[P],pq:SP[Q],pr:SP[R],ps:SP[S],pt:SP[T]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,pq,pr,ps,pt) {
-  def >> [X](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
-  def ~ [X](px: SP[X]) = new Selection21(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,pq,pr,ps,pt,px)
-  def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs);e<-pe(rs);f<-pf(rs);g<-pg(rs);h<-ph(rs);i<-pi(rs);j<-pj(rs);k<-pk(rs);l<-pl(rs);m<-pm(rs);n<-pn(rs);o<-po(rs);p<-pp(rs);q<-pq(rs);r<-pr(rs);s<-ps(rs);t<-pt(rs)) yield (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t)
+class Selection20 [+A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,T,U] (pa:S[A],pb:S[B],pc:S[C],pd:S[D],pe:S[E],pf:S[F],pg:S[G],ph:S[H],pi:S[I],pj:S[J],pk:S[K],pl:S[L],pm:S[M],pn:S[N],po:S[O],pp:S[P],pq:S[Q],pr:S[R],pt:S[T],pu:S[U]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,T,U)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,pq,pr,pt,pu) {
+  def >> [X](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,T,U)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
+  def ~ [X](px: S[X]) = new Selection21(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,pq,pr,pt,pu,px)
+  def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs);e<-pe(rs);f<-pf(rs);g<-pg(rs);h<-ph(rs);i<-pi(rs);j<-pj(rs);k<-pk(rs);l<-pl(rs);m<-pm(rs);n<-pn(rs);o<-po(rs);p<-pp(rs);q<-pq(rs);r<-pr(rs);t<-pt(rs);u<-pu(rs)) yield (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,t,u)
 }
-class Selection21 [+A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U] (pa:SP[A],pb:SP[B],pc:SP[C],pd:SP[D],pe:SP[E],pf:SP[F],pg:SP[G],ph:SP[H],pi:SP[I],pj:SP[J],pk:SP[K],pl:SP[L],pm:SP[M],pn:SP[N],po:SP[O],pp:SP[P],pq:SP[Q],pr:SP[R],ps:SP[S],pt:SP[T],pu:SP[U]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,pq,pr,ps,pt,pu) {
-  def >> [X](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
-  def ~ [X](px: SP[X]) = new Selection22(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,pq,pr,ps,pt,pu,px)
-  def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs);e<-pe(rs);f<-pf(rs);g<-pg(rs);h<-ph(rs);i<-pi(rs);j<-pj(rs);k<-pk(rs);l<-pl(rs);m<-pm(rs);n<-pn(rs);o<-po(rs);p<-pp(rs);q<-pq(rs);r<-pr(rs);s<-ps(rs);t<-pt(rs);u<-pu(rs)) yield (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u)
+class Selection21 [+A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,T,U,V] (pa:S[A],pb:S[B],pc:S[C],pd:S[D],pe:S[E],pf:S[F],pg:S[G],ph:S[H],pi:S[I],pj:S[J],pk:S[K],pl:S[L],pm:S[M],pn:S[N],po:S[O],pp:S[P],pq:S[Q],pr:S[R],pt:S[T],pu:S[U],pv:S[V]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,T,U,V)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,pq,pr,pt,pu,pv) {
+  def >> [X](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,T,U,V)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
+  def ~ [X](px: S[X]) = new Selection22(pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,pq,pr,pt,pu,pv,px)
+  def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs);e<-pe(rs);f<-pf(rs);g<-pg(rs);h<-ph(rs);i<-pi(rs);j<-pj(rs);k<-pk(rs);l<-pl(rs);m<-pm(rs);n<-pn(rs);o<-po(rs);p<-pp(rs);q<-pq(rs);r<-pr(rs);t<-pt(rs);u<-pu(rs);v<-pv(rs)) yield (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,t,u,v)
 }
-class Selection22 [+A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V] (pa:SP[A],pb:SP[B],pc:SP[C],pd:SP[D],pe:SP[E],pf:SP[F],pg:SP[G],ph:SP[H],pi:SP[I],pj:SP[J],pk:SP[K],pl:SP[L],pm:SP[M],pn:SP[N],po:SP[O],pp:SP[P],pq:SP[Q],pr:SP[R],ps:SP[S],pt:SP[T],pu:SP[U],pv:SP[V]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,pq,pr,ps,pt,pu,pv) {
-  def >> [X](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
-  def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs);e<-pe(rs);f<-pf(rs);g<-pg(rs);h<-ph(rs);i<-pi(rs);j<-pj(rs);k<-pk(rs);l<-pl(rs);m<-pm(rs);n<-pn(rs);o<-po(rs);p<-pp(rs);q<-pq(rs);r<-pr(rs);s<-ps(rs);t<-pt(rs);u<-pu(rs);v<-pv(rs)) yield (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v)
+class Selection22 [+A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,T,U,V,W] (pa:S[A],pb:S[B],pc:S[C],pd:S[D],pe:S[E],pf:S[F],pg:S[G],ph:S[H],pi:S[I],pj:S[J],pk:S[K],pl:S[L],pm:S[M],pn:S[N],po:S[O],pp:S[P],pq:S[Q],pr:S[R],pt:S[T],pu:S[U],pv:S[V],pw:S[W]) extends SelectionX[(A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,T,U,V,W)] (pa,pb,pc,pd,pe,pf,pg,ph,pi,pj,pk,pl,pm,pn,po,pp,pq,pr,pt,pu,pv,pw) {
+  def >> [X](fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,T,U,V,W)=>X) = new Selection1(apply(_) map fn.tupled, expressions)
+  def apply (rs: ResultSet) = for (a<-pa(rs);b<-pb(rs);c<-pc(rs);d<-pd(rs);e<-pe(rs);f<-pf(rs);g<-pg(rs);h<-ph(rs);i<-pi(rs);j<-pj(rs);k<-pk(rs);l<-pl(rs);m<-pm(rs);n<-pn(rs);o<-po(rs);p<-pp(rs);q<-pq(rs);r<-pr(rs);t<-pt(rs);u<-pu(rs);v<-pv(rs);w<-pw(rs)) yield (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,t,u,v,w)
 }
