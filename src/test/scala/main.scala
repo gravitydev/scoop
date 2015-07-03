@@ -63,7 +63,8 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
           u.first_name := "James",
           u.last_name := "X",
           u.email := "some@email.com",
-          u.age := 20
+          u.age := 20,
+          u.nickname := None
         )()
 
       update(u)

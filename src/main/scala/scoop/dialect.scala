@@ -72,7 +72,7 @@ trait BaseSqlDialect extends SqlDialect {
     
       case ast.SqlLiteralExpr(_) => "?"
 
-      case ast.SqlAssignment(col, value) => col.columnName <+> "=" <+> (sql(value) <> string(col.cast.map("::" + _).getOrElse(""))) // postgres hack
+      case ast.SqlAssignment(col, value) => col.columnName <+> "=" <+> (sql(value))
 
       case ast.Join(queryable, onPred, joinType) => joinType.sql <+> "JOIN" <+> aliasedSql(queryable) <+> "ON" <+> sql(onPred)
 
