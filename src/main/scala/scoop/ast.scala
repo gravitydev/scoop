@@ -170,10 +170,8 @@ trait SqlExpr[X] extends SqlExprIn[X] with SqlExprOut[X] with QueryNode {self =>
  
   def desc  = SqlOrdering(this, SqlOrder.Descending)
   def asc   = SqlOrdering(this, SqlOrder.Ascending)
-
-  type TypeMapper[A,B] = SqlType[A] => SqlType[B]
-  type ExprMapper[A,B,C] = SqlExpr[A] => SqlExpr[B] => SqlExpr[C]
 }
+
 object SqlExpr {
   implicit def intToSqlLongLit (base: Int): SqlExpr[Long] = SqlLiteralExpr(base: Long)
   implicit def queryToExpr [T:SqlType](query: Query[T]) = SqlQueryExpr[T](query)

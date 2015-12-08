@@ -2,6 +2,7 @@ package com.gravitydev.scoop
 package ast
 
 import java.sql.{ResultSet, PreparedStatement}
+import simulacrum._
 
 /**
  * Type that is used in the database
@@ -11,7 +12,7 @@ trait SqlUnderlyingType[T]
 /**
  * Type that is used in scala code
  */
-trait SqlType[T] {
+@typeclass trait SqlType[T] {
   def tpe: Int
 
   def parse (rs: ResultSet, name: String): Option[T]
@@ -24,9 +25,6 @@ trait SqlType[T] {
   def set (stmt: PreparedStatement, idx: Int, value: T): Unit
 
   def apply (name: String) = new ExprParser(name)(this)
-}
-object SqlType {
-  @inline def apply [T](implicit t: SqlType[T]) = t
 }
  
 class SqlNativeType[T] (

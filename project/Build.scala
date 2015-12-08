@@ -15,13 +15,15 @@ object ScoopBuild extends Build {
       libraryDependencies ++= Seq(
         "com.googlecode.kiama" %% "kiama" % "2.0.0-SNAPSHOT",
         "org.scalatest" %% "scalatest" % "2.1.6" % "test",
-        "mysql"         % "mysql-connector-java"  % "5.1.35"  % "test"
+        "mysql"         % "mysql-connector-java"  % "5.1.35"  % "test",
+        "com.github.mpilquist" %% "simulacrum" % "0.3.0"
       ),
       resolvers ++= Seq(
         "nexus" at "https://oss.sonatype.org/content/repositories/snapshots"
       ),
       scalacOptions ++= Seq("-deprecation","-unchecked"),
-      testOptions in Test += Tests.Argument("-oF")
+      testOptions in Test += Tests.Argument("-oF"),
+      addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0-M5" cross CrossVersion.full)
     )
 
   lazy val plugin = Project(id = "scoop-sbt-plugin", base = file("sbt-plugin"))
