@@ -15,8 +15,8 @@ object ScoopPlugin extends AutoPlugin {
     val scoopMapType = settingKey[Int=>String]("Function that maps a java.sql.Types value to a scala type.")
     val scoopOverrideColumnType = settingKey[PartialFunction[(String,String),String]]("Override the type of a column given the table name and the column name.")
     val scoopFile = settingKey[File]("The file where the generated code is placed.")
-
   }
+
   import autoImport._
 
   val scoopGenerate = taskKey[Seq[java.io.File]]("Generate the Scoop metadata for the configured database.")
