@@ -1,6 +1,6 @@
 package com.gravitydev.scoop
 
-import org.kiama.output.PrettyPrinter
+import org.bitbucket.inkytonik.kiama.output.PrettyPrinter
 import com.gravitydev.scoop.query.ParameterizedSql
 import scala.Predef.{any2stringadd => _}
 
@@ -19,15 +19,17 @@ trait SqlDialect extends PrettyPrinter {
 trait BaseSqlDialect extends SqlDialect {
   override val defaultIndent = 2
 
-  def opt (o: Option[Doc]) = o getOrElse empty
+  def opt (o: Option[Doc]) = o getOrElse emptyDoc
 
   def csv (s: Seq[Doc]) = nest(vsep(s.toList, comma))
 
-  def optSeq (prefix: Doc, n: Seq[Doc]) = if (n.isEmpty) empty else prefix <+> csv(n) <> line
+  def optSeq (prefix: Doc, n: Seq[Doc]) = if (n.isEmpty) emptyDoc else prefix <+> csv(n) <> line
+
+  private def absoluteTableName (t: ast.Table): Doc = t.schema map {_ <> "." <> t.tableName} getOrElse t.tableName
  
   def sql (n: ast.QueryNode): Doc = {
     // if there's a comment
-    (if (n._comment != "") "/*" <> n._comment.replace("/*","[*").replace("*/", "*]") <> "*/" <> line else empty) <>
+    (if (n._comment != "") "/*" <> n._comment.replace("/*","[*").replace("*/", "*]") <> "*/" <> line else emptyDoc) <>
     (n match {
       case q: ast.Query[_] => 
         // select
@@ -35,7 +37,7 @@ trait BaseSqlDialect extends SqlDialect {
         // from
         opt( q.from.map(queryable => line <> "FROM" <+> aliasedSql(queryable) ) ) <> 
         // joins
-        (if (q.joins.nonEmpty) line else empty) <> vsep( q.joins.toList.map(sql(_)) ) <> 
+        (if (q.joins.nonEmpty) line else emptyDoc) <> vsep( q.joins.toList.map(sql(_)) ) <> 
         // where
         opt( q.predicate.map(w => line <> "WHERE" <+> nest(sql(w)) ) ) <>
         // group by
@@ -55,11 +57,12 @@ trait BaseSqlDialect extends SqlDialect {
         // update lock
         opt( Option(line <> "FOR UPDATE").filter(_ => q.forUpdateLock) )
 
-      case c: ast.SqlCol[_] => c.table._alias <> "." <> c.columnName
+      //case c: ast.SqlCol[_] => c.table._alias <> "." <> c.columnName
+      case ast.Column(path, name) => path <> "." <> name
 
       case ast.SqlNamedStrictExpr(expr,_) => sql(expr)
 
-      case ast.SqlInfixExpr(l,r,op) => sql(l) <+> op <+> sql(r)
+      case ast.SqlInfixExpr(l,op,r) => sql(l) <+> op <+> sql(r)
 
       case ast.SqlBinaryApplic(values, op) =>
         ssep( 
@@ -72,27 +75,27 @@ trait BaseSqlDialect extends SqlDialect {
     
       case ast.SqlLiteralExpr(_) => "?"
 
-      case ast.SqlAssignment(col, value) => col.columnName <+> "=" <+> (sql(value))
+      case ast.SqlAssignment(col, value) => col <+> "=" <+> (sql(value))
 
       case ast.Join(queryable, onPred, joinType) => joinType.sql <+> "JOIN" <+> aliasedSql(queryable) <+> "ON" <+> sql(onPred)
 
       case ast.Delete(table, pred) => 
-        "DELETE FROM" <+> table._tableName <> line <>
+        "DELETE FROM" <+> absoluteTableName(table) <> line <>
         "WHERE" <+> sql(pred)
 
       case ast.Insert(table, assignments) => 
-        "INSERT INTO" <+> table <+> 
-        parens( ssep( assignments.toList.map(_.col.columnName).map(string), comma <> " ") ) <+>
+        "INSERT INTO" <+> absoluteTableName(table) <+> 
+        parens( ssep( assignments.toList.map(_.lhs).map(string), comma <> " ") ) <+>
         "VALUES" <+>
         parens( ssep( assignments.toList.map(a => sql(a.value)), comma <> " ") )
 
       case ast.InsertWithQuery(table, cols, query) => 
-        "INSERT INTO" <+> table <+> 
-        parens( ssep( cols.map(_.columnName).map(string), comma <> " ") ) <@>
+        "INSERT INTO" <+> absoluteTableName(table) <+> 
+        parens( ssep( cols.map(_.name).map(string), comma <> " ") ) <@>
         sql(query) 
 
       case ast.Update (table, assignments, predicate) =>
-        "UPDATE" <+> table._tableName <+> "SET" <+> 
+        "UPDATE" <+> absoluteTableName(table) <+> "SET" <+> 
         ssep( 
           assignments.toList.map(sql),
           comma <> " "
@@ -133,12 +136,12 @@ trait BaseSqlDialect extends SqlDialect {
       q.group.flatMap(params) ++
       // order by
       q.order.flatMap(params) 
-    case t: ast.TableT => Nil
+    case t: ast.Table => Nil
     case ast.SqlNamedStrictExpr(expr,_) => params(expr)
-    case ast.SqlInfixExpr(l,r,_) => params(l) ++ params(r)
+    case ast.SqlInfixExpr(l,_,r) => params(l) ++ params(r)
     case ast.SqlBinaryApplic(values, op) => values.flatMap(params)
     case l @ ast.SqlLiteralExpr(_) => Seq(l.toParam)
-    case col: ast.SqlCol[_] => Nil
+    case col: ast.Column[_] => Nil
     case ast.SqlAssignment(_, value) => params(value) 
     case ast.Join(queryable, onPred, _) => params(queryable) ++ params(onPred)
     case ast.Delete(table, pred) => params(pred)
@@ -160,8 +163,8 @@ trait BaseSqlDialect extends SqlDialect {
     case ast.SqlNamedStrictExpr(expr @ ast.SqlInfixExpr(_,_,_), name) => parens( sql(expr) ) <+> "as" <+> name
     case x @ ast.SqlNamedQueryExpr(query, name) => sql(query) <+> "as" <+> name
     case x @ ast.SqlNamedStrictExpr(expr, name) => sql(expr) <+> "as" <+> name
-    case col: ast.SqlCol[_] => sql(col) <+> "as" <+> col.name
-    case t: ast.TableT => t.fromSql  
+    case col: ast.Column[_] => sql(col) <+> "as" <+> col.name
+    case t: ast.Table => t.tableName
   }
 }
 
@@ -171,7 +174,7 @@ object MySqlDialect extends BaseSqlDialect
 
 object PostgresDialect extends BaseSqlDialect {
   override def sql (q: ast.QueryNode): Doc = q match {
-    case c: ast.SqlCol[_] => c.table._alias + "." + c.columnName + c.cast.map(_=>"::varchar").getOrElse("") // TODO: use correct base type
+    case c: ast.Column[_] => c.path + "." + c.name //+ c.cast.map(_=>"::varchar").getOrElse("") // TODO: use correct base type
     case _ => super.sql(q)
   }
 }

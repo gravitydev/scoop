@@ -2,7 +2,7 @@ package com.gravitydev.scoop
 package query
 
 import java.sql.{Connection, ResultSet}
-import ast.{SqlType, SqlRawExpr, SqlNullableCol, SqlNonNullableCol}
+import ast.{SqlType, SqlRawExpr/*, SqlNullableCol, SqlNonNullableCol*/}
 
 /** A SQL query (or fragment) along with parameters, that can be appended to another or executed if complete */
 final case class ParameterizedSql (sql: String, params: Seq[SqlParam[_]] = Nil) {
@@ -11,9 +11,6 @@ final case class ParameterizedSql (sql: String, params: Seq[SqlParam[_]] = Nil) 
   def %? (p: SqlParam[_]*) = onParams(p:_*)
   //def as (alias: String) = new AliasedSqlFragment(this, alias)
   override def toString = getClass.getName + "ParameterizedSql(sql="+sql+", params="+params+")" 
-
-  @deprecated("Use process", "0.2.6-SNAPSHOT")
-  def map [B](process: ResultSet => ParseResult[B])(implicit c: Connection): List[B] = executeQuery(this)(process).toList
 
   def process [B](rowParser: ResultSet => ParseResult[B])(implicit c: Connection): util.QueryResult[B] = new util.QueryResult(executeQuery(this)(rowParser))
 

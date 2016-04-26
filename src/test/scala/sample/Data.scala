@@ -1,6 +1,6 @@
 package sample
 
-import com.gravitydev.scoop._
+import com.gravitydev.scoop._, query._
 import Models._
 
 object Data {

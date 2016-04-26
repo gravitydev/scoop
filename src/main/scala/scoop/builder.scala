@@ -9,36 +9,41 @@ object `package` {
   type Query[T] = ast.Query[T]
 
   /** Clean up null assignments because of Option[SqlAssignment[_]] */
-  def toAstSqlAssignments (assignments: Seq[Assignment]): Seq[ast.SqlAssignment[_]] = assignments.filter(_ != null).map(_.underlying)
+  def toAstSqlAssignments (assignments: Seq[Assignment]): Seq[ast.SqlAssignment] = assignments.filter(_ != null).map(_.underlying)
 }
 
 /** Wrapper for supporting optional setting of values */
-sealed class Assignment (val underlying: ast.SqlAssignment[_])
+private [scoop] final class Assignment (val underlying: ast.SqlAssignment)
 object Assignment {
-  implicit def fromSqlAssignment [T](a: ast.SqlAssignment[T]): Assignment = new Assignment(a)
-  implicit def fromOption [T](a: Option[ast.SqlAssignment[T]]): Assignment = a.map(x => fromSqlAssignment(x)) getOrElse null
+  implicit def fromSqlAssignment (a: ast.SqlAssignment): Assignment = new Assignment(a)
+  implicit def fromOption (a: Option[ast.SqlAssignment]): Assignment = a.map(x => fromSqlAssignment(x)) getOrElse null
 }
-
 
 class JoinBuilder (queryable: ast.Queryable, predicate: ast.SqlExpr[Boolean]) {
   def build (joinType: ast.JoinType) = new ast.Join(queryable, predicate, joinType)
 }
 
-class InsertBuilder (into: String) {
-  def set (assignments: Assignment*) = ast.Insert (into, toAstSqlAssignments(assignments))
-  def values (assignments: Assignment*) = ast.Insert(into, toAstSqlAssignments(assignments))
-  def apply (columns: ast.SqlCol[_]*) = new InsertBuilder2(into, columns.toList)
-}
-class InsertBuilder2 (into: String, columns: List[ast.SqlCol[_]]) {
-  def values (query: ast.Query[_]) = ast.InsertWithQuery(into, columns, query)
-}
-
-class UpdateBuilder (tb: ast.TableT) {
-  def set (assignments: Assignment*) = ast.Update (tb, toAstSqlAssignments(assignments), None)
+object InsertBuilder { 
+  case class Into (into: ast.Table) {
+    def set (assignments: Assignment*) = ast.Insert (into, toAstSqlAssignments(assignments))
+    def values (assignments: Assignment*) = ast.Insert(into, toAstSqlAssignments(assignments))
+    def apply (columns: ast.Column[_]*) = IntoColumns(into, columns.toList)
+  }
+  case class IntoColumns (into: ast.Table, columns: List[ast.Column[_]]) {
+    def values (query: ast.Query[_]) = ast.InsertWithQuery(into, columns, query)
+  }
 }
 
-class DeleteBuilder (tb: ast.TableT) {
-  def where (pred: ast.SqlExpr[Boolean]) = new ast.Delete(tb, pred)
+object UpdateBuilder {
+  case class Target(tb: ast.Table) {
+    def set (assignments: Assignment*) = ast.Update (tb, toAstSqlAssignments(assignments), None)
+  }
+}
+
+object DeleteBuilder {
+  case class From (tb: ast.Table) {
+    def where (pred: ast.SqlExpr[Boolean]) = new ast.Delete(tb, pred)
+  }
 }
 
 

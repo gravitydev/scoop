@@ -220,6 +220,7 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
 
   "An assignment" should "allow expressions" in {
     using (tables.users) {u =>
+      println(u.age + 1)
       val q = update(u)
         .set(u.age := u.age + 1)
 
@@ -263,12 +264,12 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
     val i = tables.issues as "i"
 
     val nums = List(IssueStatuses.Open, IssueStatuses.Closed)
-    val mapped = nums.map(v => i.status === v and i.status === v and i.status === v)
-    val folded = mapped.foldLeft(false : ast.SqlExpr[Boolean])(_ or _)
+    val mapped = nums.map(v => i.status === v && i.status === v && i.status === v)
+    val folded = mapped.foldLeft(false : ast.SqlExpr[Boolean])(_ || _)
 
     {
       val x = 
-        "(" +~ from(u).where(u.id |=| 24).select(u.id) +~ ") UNION (" +~ from(i).where(i.id === 13).select(u.id) +~ ")"
+        "(" +~ from(u).where(u.id === 24).select(u.id) +~ ") UNION (" +~ from(i).where(i.id === 13).select(u.id) +~ ")"
     }
 
     {
@@ -287,11 +288,11 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
 
     val testParser = i.id ~ xparser
     val qq = from(i) select(i.id) 
-    val qx = from(i).where(i.id |=| qq)
+    val qx = from(i).where(i.id === qq)
 
     val num = "SELECT 1 as num FROM users WHERE 1 = ?" %? 1 process sqlInt("num") head;
 
-    val n = i.id |=| 24
+    val n = i.id === 24
  
   }
 
@@ -299,8 +300,8 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
     
     using (tables.issues as "i", tables.users as "reporter") {(i,u) =>
       tables.issues._tableName  should be ("issues")
-      tables.issues.release_id.columnName should be ("release_id")
-      i.release_id.columnName   should be ("release_id")
+      tables.issues.release_id.name should be ("release_id")
+      i.release_id.name         should be ("release_id")
       i.release_id.name         should be ("i_release_id")
 
       from(i)
@@ -381,7 +382,7 @@ class ScoopSpec extends FlatSpec with ShouldMatchers {
         .where(
           u.age < 24 && 
           (u.id === 27 || u.id === 23 || u.id === 7) &&
-          (u.id |=| from(u).select(29L as "num"))
+          (u.id === from(u).select(29L as "num"))
         )
         .limit(100)
         .offset(10)

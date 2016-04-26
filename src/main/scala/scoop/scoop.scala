@@ -1,18 +1,18 @@
 package com.gravitydev.scoop
 
 import java.sql.{ResultSet, PreparedStatement, Types, Timestamp, Date}
-import ast.{SqlNamedExpr, SqlNamedQuery, SqlParseStrictExpr, SqlNonNullableCol, SqlNullableCol, SqlUnderlyingType}
+import ast.{SqlNamedExpr, SqlNamedQuery, SqlParseStrictExpr/*, SqlNonNullableCol, SqlNullableCol*/, SqlUnderlyingType}
 import parsers.Selection1
 
 object `package` {
   // aliases for convenience
-  type Table[T <: ast.SqlTable[T]] = ast.SqlTable[T]
+  type Table[T <: definition.Table[T]] = definition.Table[T]
   type TableCompanion[T <: Table[T]] = {def apply() : T}
 
   type SqlType[T]         = ast.SqlType[T]
   type SqlExpr[T]         = ast.SqlExpr[T]
   type SqlNativeType[T]   = ast.SqlNativeType[T]
-  type SqlCustomType[I,O] = ast.SqlCustomType[I,O]
+  //type SqlCustomType[I,O] = ast.SqlCustomType[I,O]
 
   type ExprParser[T]      = parsers.ExprParser[T]
   type ResultSetParser[T] = parsers.ResultSetParser[T]
@@ -77,8 +77,8 @@ object `package` {
     (_,_,_) => sys.error("internal")
   )
 
-  implicit def nonNullableColToSelection [X] (col: SqlNonNullableCol[X]): Selection1[X] = new Selection1 (col, col.expressions)
-  implicit def nullableColToSelection [X] (col: SqlNullableCol[X]): Selection1[Option[X]] = new Selection1 (col, col.expressions)
+  //implicit def nonNullableColToSelection [X] (col: SqlNonNullableCol[X]): Selection1[X] = new Selection1 (col, col.expressions)
+  //implicit def nullableColToSelection [X] (col: SqlNullableCol[X]): Selection1[Option[X]] = new Selection1 (col, col.expressions)
 
   /** Turns a named query into an named expression (Selection) */
   implicit def namedQueryToExpr[T:SqlType](q: SqlNamedQuery[T]): ast.SqlNamedQueryExpr[T] = new ast.SqlNamedQueryExpr(q.query, q.name)

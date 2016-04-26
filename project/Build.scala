@@ -13,7 +13,7 @@ object ScoopBuild extends Build {
       crossScalaVersions := Seq("2.11.1", "2.10.4"),
       publishTo := Some(gravityRepo),
       libraryDependencies ++= Seq(
-        "com.googlecode.kiama" %% "kiama" % "2.0.0-SNAPSHOT",
+        "org.bitbucket.inkytonik.kiama" %% "kiama" % "2.0.0",
         "org.scalatest" %% "scalatest" % "2.1.6" % "test",
         "mysql"         % "mysql-connector-java"  % "5.1.35"  % "test",
         "com.github.mpilquist" %% "simulacrum" % "0.3.0"

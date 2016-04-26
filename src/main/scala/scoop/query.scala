@@ -5,8 +5,15 @@ import java.sql.{Connection, Date, Timestamp, ResultSet}
 import scala.collection.mutable.ListBuffer
 import util.{ResultSetIterator, QueryResult}
 import scala.collection._, 
-  ast.{Query, Join, SqlType, SqlParseStrictExpr, SqlLiteralExpr, SqlCol, SqlRawExpr, SqlNamedExpr}
+  ast.{Query, Join, SqlType, SqlParseStrictExpr, SqlLiteralExpr, /*SqlCol, */SqlRawExpr, SqlNamedExpr}
 import builder.{DeleteBuilder, QueryBuilder, InsertBuilder, UpdateBuilder}
+
+case class TableBuilder [A](table: A)
+object TableBuilder {
+  implicit def fromTable[T] (table: T) = TableBuilder(table)
+  implicit def fromCompanion[T](tableComp: () => T) = TableBuilder(tableComp())
+}
+
 
 object `package` extends builder.QueryBuilderBase {
   @deprecated("Use SqlExpr[Boolean]", "0.1.23-SNAPSHOT")
@@ -21,7 +28,7 @@ object `package` extends builder.QueryBuilderBase {
   implicit def intToLongExpr (a: SqlExpr[Int]): SqlExpr[Long] = a.cast[Long] 
 
   implicit def baseToSqlLit [T](base: T)(implicit sqlType: SqlType[T]): SqlParseStrictExpr[T] = SqlLiteralExpr(base)
-  implicit def tableToWrapped [T <: ast.TableT] (t: T) = new TableOps(t)
+  //implicit def tableToWrapped [T <: definition.TableT] (t: T) = new TableOps(t)
   implicit def optToSqlLit [T](base: Option[T])(implicit sqlType: SqlType[T]) = base map {x => SqlLiteralExpr(x)}
   implicit def baseToParam [T](base: T)(implicit sqlType: SqlType[T]) = SqlSingleParam(base)
 
@@ -29,22 +36,44 @@ object `package` extends builder.QueryBuilderBase {
   
   implicit def companionToTable [T <: Table[T]] (companion: {def apply (): T}): T = companion()
 
+  implicit def fromColumn [T:SqlType](t: definition.Column[T]): ast.Column[T] = ast.Column[T](t.table._alias getOrElse t.table._tableName, t.name)
+
+  implicit def nonNullableColumnToSelection [T](col: definition.NonNullableColumn[T]): parsers.Selection1[T] = new parsers.Selection1[T](
+    rs => col.sqlTpe.parseOr(rs, col.name, s"Cannot parse [$col] from [$rs]"),
+    List(col)
+  )
+  implicit def nullableColumnToSelection [T](col: definition.NullableColumn[T]): parsers.Selection1[Option[T]] = new parsers.Selection1[Option[T]](
+    rs => Right(col.sqlTpe.parse(rs, col.name)),
+    List(col)
+  )
+
+  implicit class TableOps [T <: definition.TableT](t: T) {
+    def on (pred: SqlExpr[Boolean]) = 
+      new builder.JoinBuilder(
+        ast.Table(t._tableName, t._schema), 
+        pred
+      )
+  }
+
+  implicit class NonNullableColumnOps[T:SqlType](col: definition.NonNullableColumn[T]) {
+    def as (alias: String) = ast.SqlNamedStrictExpr(col, alias)
+    def := (x: SqlExpr[T]) = ast.SqlAssignment(col.name, x)
+  }
+  implicit class NullableColumnOps[T:SqlType](col: definition.NullableColumn[T]) {
+    def as (alias: String) = ast.SqlNamedOptExpr(col, alias)
+    def := (x: Option[T]): ast.SqlAssignment = ast.SqlAssignment(col.name, x map (v => ast.SqlLiteralExpr(v)) getOrElse ast.SqlNull)
+    def := (x: SqlExpr[Option[T]]): ast.SqlAssignment = ast.SqlAssignment(col.name, x)
+  }
+
   def exists [T:SqlType](query: builder.Query[T]) = ast.SqlUnaryExpr[T,Boolean](new ast.SqlQueryExpr(query), "EXISTS", postfix=false)
   def notExists [T:SqlType](query: ast.SqlQueryExpr[T]) = ast.SqlUnaryExpr[T,Boolean](query, "NOT EXISTS", postfix=false) 
 
   // starting point
   def from (table: ast.Queryable) = QueryBuilder(Some(table))
   def where (pred: ast.SqlExpr[Boolean]) = QueryBuilder(None, predicate = Some(pred))
-  //def select (cols: builder.SelectExpr*): Query = Query(None, sel = cols.toList)
-  def insertInto (table: Table[_]) = new InsertBuilder(table._tableName)
-  def update (table: ast.TableT) = new UpdateBuilder(table)
-  def deleteFrom (table: ast.TableT) = new DeleteBuilder(table)
-
-  @deprecated("Use sqlExpr", "1.0") 
-  def sql [T:SqlType] (sql: String): SqlParseStrictExpr[T] = sqlExpr(ParameterizedSql(sql, Nil))
-
-  @deprecated("Use sqlExpr", "1.0")
-  def sql [T:SqlType] (sql: ParameterizedSql): SqlParseStrictExpr[T] = sqlExpr(sql)
+  def insertInto (table: ast.Table) = InsertBuilder.Into(table)
+  def update (table: ast.Table) = UpdateBuilder.Target(table)
+  def deleteFrom (table: ast.Table) = DeleteBuilder.From(table)
 
   def sqlExpr [T:SqlType] (sql: ParameterizedSql): SqlParseStrictExpr[T] = SqlRawExpr[T](sql)
  
@@ -63,7 +92,7 @@ object `package` extends builder.QueryBuilderBase {
       }
     }
     
-    def apply [A <: Table[A]] (a: TableCompanion[A]) = a as getAlias(a._alias)
+    def apply [A <: Table[A]] (a: TableBuilder[A]): A = a.table as getAlias(a.table._alias getOrElse a.table._tableName)
   }
     
   private [this] def aliasing [T](fn: Aliaser => T) = fn(new Aliaser)
@@ -83,7 +112,9 @@ object `package` extends builder.QueryBuilderBase {
   }
   
   
-  private type TC[A <: Table[A]] = TableCompanion[A]
+  //private type TC[A <: Table[A]] = TableCompanion[A]
+  //private type TC[A <: Table[A]] = () => A //TableCompanion[A]
+  private type TC[A <: Table[A]] = TableBuilder[A]
   
   def using [R, A <: Table[A]](a: TC[A])(fn: A => R) = aliasing(x => fn(x(a)))
   def using [R, A <: Table[A], B <: Table[B]](a: TC[A], b: TC[B])(fn: (A,B)=>R) = aliasing(x => fn(x(a), x(b)))
@@ -105,7 +136,4 @@ object `package` extends builder.QueryBuilderBase {
   def using [R, A <: Table[A], B <: Table[B], C <: Table[C], D <: Table[D], E <: Table[E], F <: Table[F], G <: Table[G], H <: Table[H], I <: Table[I], J <: Table[J], K <: Table[K], L <: Table[L], M <: Table[M], N <: Table[N], O <: Table[O], P <: Table[P], Q <: Table[Q], S <: Table[S]](a: TC[A], b: TC[B], c: TC[C], d: TC[D], e: TC[E], f: TC[F], g: TC[G], h: TC[H], i: TC[I], j: TC[J], k: TC[K], l: TC[L], m: TC[M], n: TC[N], o: TC[O], p: TC[P], q: TC[Q], s: TC[S])(fn: (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,S)=>R) = aliasing(x => fn(x(a), x(b), x(c), x(d), x(e), x(f), x(g), x(h), x(i), x(j), x(k), x(l), x(m), x(n), x(o), x(p), x(q), x(s)))
 }
 
-class TableOps [T <: ast.TableT](t: T) {
-  def on (pred: SqlExpr[Boolean]) = new builder.JoinBuilder(t, pred)
-}
 
